@@ -1,0 +1,252 @@
+.tableContainer {
+  overflow-x: auto;
+  margin: 0 -20px -20px;
+  border-top: 1px solid var(--line);
+  scrollbar-width: thin;
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+  text-align: left;
+}
+
+.table th {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  font-weight: 700;
+  color: var(--faint);
+  background: color-mix(in srgb, var(--surface-2) 70%, var(--surface));
+  padding: 11px 20px;
+  white-space: nowrap;
+}
+
+.table td {
+  padding: 14px 20px;
+  border-top: 1px solid color-mix(in srgb, var(--line) 75%, transparent);
+  white-space: nowrap;
+  vertical-align: middle;
+  color: var(--text);
+}
+
+.table tbody tr {
+  transition: background-color 0.15s ease;
+}
+
+.clickableRow {
+  cursor: pointer;
+}
+
+.clickableRow:hover td {
+  background: color-mix(in srgb, #6366F1 5%, transparent);
+}
+
+/* Employee Cell */
+.empCell {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.empAvatar {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #6366F1, #8B5CF6);
+  color: #FFFFFF;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+
+.empDetails {
+  display: flex;
+  flex-direction: column;
+}
+
+.empName {
+  font-weight: 600;
+  color: var(--text);
+  line-height: 1.25;
+}
+
+.empCode {
+  font-size: 12px;
+  color: var(--muted);
+  font-family: monospace;
+}
+
+.deptBadge {
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.countCell {
+  font-weight: 500;
+  color: var(--text);
+}
+
+.overdueCell {
+  color: var(--bad, #EF4444);
+  font-weight: 700;
+}
+
+/* Progress bar */
+.progressCell {
+  min-width: 140px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.progressBarTrack {
+  flex: 1;
+  height: 7px;
+  border-radius: 999px;
+  background: var(--surface-2);
+  overflow: hidden;
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.06);
+}
+
+.progressBarFill {
+  height: 100%;
+  border-radius: 999px;
+  background: linear-gradient(90deg, #10B981, #059669);
+  transition: width 0.3s ease;
+}
+
+.progressBarFillWarn {
+  background: linear-gradient(90deg, #F59E0B, #D97706);
+}
+
+.progressBarFillBad {
+  background: linear-gradient(90deg, #EF4444, #DC2626);
+}
+
+.progressPct {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--muted);
+  width: 36px;
+  text-align: right;
+}
+
+.mutedText {
+  font-size: 13px;
+  color: var(--faint, #94A3B8);
+  font-style: italic;
+}
+
+/* Status Pills */
+.pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11.5px;
+  font-weight: 600;
+  padding: 3px 10px;
+  border-radius: 20px;
+  white-space: nowrap;
+}
+
+.pill::before {
+  content: "";
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+.pCompliant {
+  background: var(--ok-bg, #E6FBF2);
+  color: var(--ok, #059669);
+}
+
+.pInProgress {
+  background: var(--warn-bg, #FFF4DB);
+  color: var(--warn, #C98200);
+}
+
+.pOverdue {
+  background: var(--bad-bg, #FEECEC);
+  color: var(--bad, #EF4444);
+}
+
+.pNotStarted {
+  background: var(--surface-2);
+  color: var(--muted);
+}
+
+.detailsBtn {
+  background: transparent;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 4px 10px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--muted);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.detailsBtn:hover {
+  background: var(--surface-2);
+  color: var(--text);
+  border-color: var(--brand, #0B6FDB);
+}
+
+/* Pagination */
+.paginationRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 20px;
+  font-size: 13px;
+  color: var(--muted);
+  background: color-mix(in srgb, var(--surface-2) 50%, var(--surface));
+  border-top: 1px solid var(--line);
+  margin: 0 -20px -20px;
+  border-radius: 0 0 18px 18px;
+}
+
+.paginationBtns {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.pageBtn {
+  display: inline-flex;
+  align-items: center;
+  padding: 5px 12px;
+  border-radius: 7px;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  color: var(--text);
+  font-size: 12.5px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.pageBtn:hover:not(:disabled) {
+  background: var(--surface-2);
+  border-color: var(--brand, #0B6FDB);
+}
+
+.pageBtn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.emptyState {
+  padding: 50px 20px;
+  text-align: center;
+  color: var(--muted);
+  font-size: 14.5px;
+}

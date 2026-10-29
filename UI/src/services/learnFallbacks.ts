@@ -1,0 +1,305 @@
+import {
+  TrainingProgramme,
+  CourseCategory,
+  SkillsMatrixResponse,
+  CompletionTrackerResponse,
+  CompletionRecord,
+  RecommendationsResponse,
+  PoshRecord,
+  SecurityTraining,
+  LearnDashboardMetrics,
+  Course,
+} from './types';
+
+export const fallbackDashboardMetrics: LearnDashboardMetrics = {
+  mandatory_compliance: 84.5,
+  total_courses: 8,
+  mandatory_courses_count: 3,
+  elective_courses_count: 5,
+  in_progress_count: 42,
+  people_behind_count: 7,
+  active_learners_30d: 68,
+  avg_completion_days: 12,
+  completion_by_course: [
+    { course_id: 'c1', title: 'POSH & Workplace Ethics 2026', course_type: 'Mandatory', percentage: 92, total_assigned: 50, completed_count: 46 },
+    { course_id: 'c2', title: 'Data Privacy & GDPR Fundamentals', course_type: 'Mandatory', percentage: 88, total_assigned: 48, completed_count: 42 },
+    { course_id: 'c3', title: 'Information Security Essentials', course_type: 'Mandatory', percentage: 76, total_assigned: 50, completed_count: 38 },
+  ],
+  compliance_breakdown: [
+    { course_id: 'c1', title: 'POSH & Workplace Ethics 2026', due_date: '2026-10-31', completion_percentage: 92, total_assigned: 50, completed_count: 46 },
+    { course_id: 'c2', title: 'Data Privacy & GDPR Fundamentals', due_date: '2026-11-05', completion_percentage: 88, total_assigned: 48, completed_count: 42 },
+    { course_id: 'c3', title: 'Information Security Essentials', due_date: '2026-10-29', completion_percentage: 76, total_assigned: 50, completed_count: 38 },
+  ],
+  open_mandatory: [
+    { assignment_id: 'asg-1', employee_id: 'emp-1', employee_name: 'Naresh Vemparala', department: 'Engineering', course_id: 'c1', course_title: 'POSH & Workplace Ethics 2026', due_date: '2026-10-31', progress: 30 },
+    { assignment_id: 'asg-2', employee_id: 'emp-2', employee_name: 'Siddharth Rao', department: 'Infrastructure', course_id: 'c3', course_title: 'Information Security Essentials', due_date: '2026-10-29', progress: 50 },
+    { assignment_id: 'asg-3', employee_id: 'emp-3', employee_name: 'Priya Menon', department: 'Product', course_id: 'c2', course_title: 'Data Privacy & GDPR Fundamentals', due_date: '2026-11-05', progress: 0 },
+  ],
+  total_open_mandatory: 3,
+};
+
+export const fallbackCourses: Course[] = [
+  { id: 'c1', title: 'POSH & Workplace Ethics 2026', course_type: 'Mandatory', duration: '45 mins', audience: 'All Staff', due_date: '2026-10-31', total_assigned: 50, completed_count: 46, completion_percentage: 92 },
+  { id: 'c2', title: 'Data Privacy & GDPR Fundamentals', course_type: 'Mandatory', duration: '60 mins', audience: 'All Staff', due_date: '2026-11-05', total_assigned: 48, completed_count: 42, completion_percentage: 88 },
+  { id: 'c3', title: 'Information Security Essentials', course_type: 'Mandatory', duration: '30 mins', audience: 'Engineering', due_date: '2026-10-29', total_assigned: 50, completed_count: 38, completion_percentage: 76 },
+  { id: 'c4', title: 'Rust Systems Programming Patterns', course_type: 'Elective', duration: '120 mins', audience: 'Engineering', due_date: null, total_assigned: 25, completed_count: 18, completion_percentage: 72 },
+  { id: 'c5', title: 'React 18 & Design Systems Architecture', course_type: 'Elective', duration: '90 mins', audience: 'Frontend', due_date: null, total_assigned: 30, completed_count: 24, completion_percentage: 80 },
+];
+
+export const fallbackProgrammes: TrainingProgramme[] = [
+  {
+    id: 'prog-1',
+    prog: 'Full Stack Engineering Acceleration',
+    ttype: 'Technical Bootcamp',
+    trainer: 'Vikram Malhotra',
+    mode: 'Hybrid',
+    start: '2026-10-01',
+    end: '2026-11-15',
+    parts: 18,
+    cost: 45000,
+    status: 'Ongoing',
+    notes: 'Covers Rust (Loco.rs) and React 18 production patterns.',
+  },
+  {
+    id: 'prog-2',
+    prog: 'Leadership & People Operations 2026',
+    ttype: 'Leadership',
+    trainer: 'Ananya Rao',
+    mode: 'In-person',
+    start: '2026-09-15',
+    end: '2026-10-15',
+    parts: 12,
+    cost: 30000,
+    status: 'Completed',
+    notes: 'Management skills, 1-on-1 feedback, and performance appraisals.',
+  },
+  {
+    id: 'prog-3',
+    prog: 'Cloud Security & SOC 2 Compliance',
+    ttype: 'Compliance',
+    trainer: 'Karthik Reddy',
+    mode: 'Virtual',
+    start: '2026-11-01',
+    end: '2026-11-20',
+    parts: 28,
+    cost: 60000,
+    status: 'Planned',
+    notes: 'Mandatory annual audit prep for all engineers.',
+  },
+];
+
+export const fallbackCategories: CourseCategory[] = [
+  { id: 'cat-1', name: 'Engineering & Architecture', description: 'Core software engineering, APIs, and cloud services', color: '#0B6FDB', course_count: 8, created_at: '2026-01-10', updated_at: '2026-10-20' },
+  { id: 'cat-2', name: 'Information Security', description: 'Infosec, data privacy, and secure coding practices', color: '#15A36B', course_count: 5, created_at: '2026-01-10', updated_at: '2026-10-20' },
+  { id: 'cat-3', name: 'Statutory Compliance', description: 'POSH, Labour law, and ethical conduct regulations', color: '#D9466F', course_count: 4, created_at: '2026-01-10', updated_at: '2026-10-20' },
+  { id: 'cat-4', name: 'Product & Design', description: 'Product management, Figma UI/UX, and design systems', color: '#7C5CFF', course_count: 3, created_at: '2026-01-10', updated_at: '2026-10-20' },
+];
+
+export const fallbackSkillsMatrix: SkillsMatrixResponse = {
+  skills: [
+    { id: 'sk-1', name: 'Rust & Systems', category: 'Backend' },
+    { id: 'sk-2', name: 'React & TypeScript', category: 'Frontend' },
+    { id: 'sk-3', name: 'Cloud & Kubernetes', category: 'DevOps' },
+    { id: 'sk-4', name: 'System Security', category: 'Security' },
+  ],
+  employees: [
+    {
+      employee_code: 'BC-1004',
+      full_name: 'Ananya Rao',
+      department: 'People Ops',
+      role: 'People Ops Lead',
+      skills: {
+        'sk-1': { level: 'Beginner', verified: true, updated_at: '2026-10-01' },
+        'sk-2': { level: 'Intermediate', verified: true, updated_at: '2026-10-01' },
+        'sk-3': { level: 'Beginner', verified: false, updated_at: '2026-10-01' },
+        'sk-4': { level: 'Advanced', verified: true, updated_at: '2026-10-01' },
+      },
+    },
+    {
+      employee_code: 'BC-1012',
+      full_name: 'Karthik Reddy',
+      department: 'AI Research',
+      role: 'Principal AI Engineer',
+      skills: {
+        'sk-1': { level: 'Expert', verified: true, updated_at: '2026-10-01' },
+        'sk-2': { level: 'Expert', verified: true, updated_at: '2026-10-01' },
+        'sk-3': { level: 'Advanced', verified: true, updated_at: '2026-10-01' },
+        'sk-4': { level: 'Expert', verified: true, updated_at: '2026-10-01' },
+      },
+    },
+    {
+      employee_code: 'BC-1020',
+      full_name: 'Rahul Varma',
+      department: 'Engineering',
+      role: 'Backend Engineer',
+      skills: {
+        'sk-1': { level: 'Advanced', verified: true, updated_at: '2026-10-01' },
+        'sk-2': { level: 'Intermediate', verified: true, updated_at: '2026-10-01' },
+        'sk-3': { level: 'Intermediate', verified: true, updated_at: '2026-10-01' },
+        'sk-4': { level: 'Intermediate', verified: false, updated_at: '2026-10-01' },
+      },
+    },
+  ],
+  categories: ['Backend', 'Frontend', 'DevOps', 'Security'],
+  levels: ['Beginner', 'Intermediate', 'Advanced', 'Expert'],
+};
+
+export const fallbackCompletion: CompletionTrackerResponse = {
+  total_employees: 28,
+  fully_compliant_count: 22,
+  in_progress_count: 4,
+  overdue_count: 2,
+  overall_compliance_pct: 86,
+  records: [
+    {
+      employee_id: 'BC-1004',
+      employee_name: 'Ananya Rao',
+      department: 'People Ops',
+      assigned_count: 4,
+      completed_count: 4,
+      pending_count: 0,
+      overdue_count: 0,
+      progress_pct: 100,
+      status: 'Compliant',
+    },
+    {
+      employee_id: 'BC-1012',
+      employee_name: 'Karthik Reddy',
+      department: 'AI Research',
+      assigned_count: 4,
+      completed_count: 4,
+      pending_count: 0,
+      overdue_count: 0,
+      progress_pct: 100,
+      status: 'Compliant',
+    },
+    {
+      employee_id: 'BC-1020',
+      employee_name: 'Rahul Varma',
+      department: 'Engineering',
+      assigned_count: 4,
+      completed_count: 3,
+      pending_count: 1,
+      overdue_count: 0,
+      progress_pct: 75,
+      status: 'In progress',
+    },
+  ],
+};
+
+export const fallbackRecords: CompletionRecord[] = [
+  {
+    id: 'rec-1',
+    course_id: 'c-posh-2026',
+    course_title: 'POSH Awareness & Prevention at Workplace 2026',
+    course_type: 'Mandatory Compliance',
+    category_name: 'Statutory Compliance',
+    duration: '60 mins',
+    completed_at: '2026-09-12',
+    is_assessment: true,
+    score: 95,
+    record_type: 'assessment_verified',
+    employee_name: 'Ananya Rao',
+    employee_id: 'BC-1004',
+  },
+  {
+    id: 'rec-2',
+    course_id: 'c-sec-2026',
+    course_title: 'Information Security & Data Protection',
+    course_type: 'Compliance',
+    category_name: 'Information Security',
+    duration: '45 mins',
+    completed_at: '2026-09-15',
+    is_assessment: true,
+    score: 90,
+    record_type: 'assessment_verified',
+    employee_name: 'Karthik Reddy',
+    employee_id: 'BC-1012',
+  },
+  {
+    id: 'rec-3',
+    course_id: 'c-rust-prod',
+    course_title: 'Loco.rs Production Patterns & Async Rust',
+    course_type: 'Technical',
+    category_name: 'Engineering & Architecture',
+    duration: '120 mins',
+    completed_at: '2026-10-10',
+    is_assessment: false,
+    record_type: 'hr_recorded',
+    employee_name: 'Rahul Varma',
+    employee_id: 'BC-1020',
+  },
+];
+
+export const fallbackRecommendations: RecommendationsResponse = {
+  recommendations: [
+    {
+      id: 'rec-item-1',
+      course_id: 'c-soc2',
+      title: 'SOC 2 Type II Readiness',
+      course_type: 'Compliance',
+      duration: '45 mins',
+      category: 'Security',
+      rule_type: 'mandatory_compliance',
+      reason: 'Mandatory company-wide annual compliance requirement.',
+    },
+    {
+      id: 'rec-item-2',
+      course_id: 'c-react-adv',
+      title: 'Advanced React 18 Patterns',
+      course_type: 'Technical',
+      duration: '90 mins',
+      category: 'Engineering',
+      rule_type: 'proficiency_growth',
+      reason: 'Recommended for front-end architecture enhancement.',
+    },
+  ],
+  employee_department: 'Engineering',
+  employee_name: 'Rahul Varma',
+  total_skills_mastered: 6,
+};
+
+export const fallbackPosh: PoshRecord[] = [
+  {
+    id: 'posh-1',
+    rtype: 'Committee member',
+    emp: 'BC-1004',
+    name: 'Ananya Rao',
+    role: 'Presiding Officer',
+    date: '2026-01-15',
+    valid: '2027-01-14',
+    parts: 5,
+    status: 'Active',
+  },
+  {
+    id: 'posh-2',
+    rtype: 'Training session',
+    name: 'Q3 POSH Employee Sensitization',
+    date: '2026-08-20',
+    valid: '2027-08-19',
+    parts: 28,
+    status: 'Completed',
+  },
+];
+
+export const fallbackSectrain: SecurityTraining[] = [
+  {
+    id: 'sec-1',
+    course: 'Phishing Defense & Credential Hygiene',
+    emp: 'Rahul Varma',
+    assigned: '2026-09-01',
+    due: '2026-10-31',
+    score: 88,
+    status: 'In progress',
+  },
+  {
+    id: 'sec-2',
+    course: 'Phishing Defense & Credential Hygiene',
+    emp: 'Ananya Rao',
+    assigned: '2026-09-01',
+    due: '2026-10-31',
+    done: '2026-09-20',
+    score: 96,
+    status: 'Completed',
+  },
+];
