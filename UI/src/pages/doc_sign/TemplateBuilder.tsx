@@ -1,42 +1,47 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useRef } from 'react';
 import { SignTemplateItem, SignEnvelope } from './types';
-import * as templateService from '../../services/templateService';
 import { NewSignatureModal } from './components/NewSignatureModal';
 import { ic } from '../../components/icons';
 
-export const TemplateBuilder: React.FC = () => {
-  const [templates, setTemplates] = useState<SignTemplateItem[]>([]);
+const initialTemplates: SignTemplateItem[] = [
+  { n: 'Employment contract (India)', f: 6, used: 14 },
+  { n: 'Non-disclosure agreement (mutual)', f: 4, used: 22 },
+  { n: 'IP assignment declaration', f: 3, used: 9 },
+  { n: 'Director loan agreement', f: 5, used: 2 },
+  { n: 'Consulting services agreement', f: 7, used: 11 },
+  { n: 'Asset handover declaration', f: 4, used: 18 },
+];
 
-  useEffect(() => {
-    templateService
-      .getTemplates()
-      .then((data) => {
-        if (data && data.length > 0) {
-          setTemplates(
-            data.map((t) => ({
-              id: t.id,
-              n: t.title || 'Template',
-              f: t.requiredFields || 4,
-              used: t.usageCount || 0,
-              category: t.category,
-            }))
-          );
-        }
-      })
-      .catch(() => {});
-  }, []);
-  const [selectedTemplate, setSelectedTemplate] = useState<string | null>(null);
+export const TemplateBuilder: React.FC = () => {
+  const [templates, setTemplates] = useState<SignTemplateItem[]>(initialTemplates);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [selectedTemplate, setSelectedTemplate] = useState<string | null>(null);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   const showToast = (msg: string) => {
     setToastMessage(msg);
-    setTimeout(() => setToastMessage(null), 2800);
+    setTimeout(() => setToastMessage(null), 3000);
   };
 
   const handleUseTemplate = (tplName: string) => {
     setSelectedTemplate(tplName);
     setIsModalOpen(true);
+  };
+
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const templateName = file.name.replace(/\.[^/.]+$/, '');
+      const newTpl: SignTemplateItem = {
+        n: templateName,
+        f: 4,
+        used: 0,
+      };
+      setTemplates((prev) => [newTpl, ...prev]);
+      showToast(`Uploaded template: ${file.name}`);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    }
   };
 
   const handleSend = (newEnv: Omit<SignEnvelope, 'id' | 'sent' | 'status'>) => {
@@ -67,10 +72,17 @@ export const TemplateBuilder: React.FC = () => {
         </div>
 
         <div className="actions">
+          <input
+            type="file"
+            ref={fileInputRef}
+            onChange={handleFileUpload}
+            accept=".pdf,.doc,.docx"
+            style={{ display: 'none' }}
+          />
           <button
             type="button"
             className="btn flex items-center gap-1.5"
-            onClick={() => showToast('Template upload isn’t connected in this prototype')}
+            onClick={() => fileInputRef.current?.click()}
           >
             {ic('upload', 16)}
             Upload template

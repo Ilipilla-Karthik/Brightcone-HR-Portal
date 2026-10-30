@@ -1,8 +1,8 @@
 import React from 'react';
-import { DailyAttendancePage } from '../DailyAttendancePage';
+import { RecordModulePage } from '../../components/records/RecordModulePage';
 
 export const AttendanceAdmin: React.FC = () => {
-  return <DailyAttendancePage />;
+  return <RecordModulePage kind="att" />;
 };
 
 export default AttendanceAdmin;

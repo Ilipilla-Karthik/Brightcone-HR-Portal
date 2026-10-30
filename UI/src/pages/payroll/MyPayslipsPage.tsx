@@ -1,8 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { api } from '../../services/api';
 import { ic } from '../../components/icons';
-import { useToast } from '../../components/ui/use-toast';
-import { Card, Table, TableHeader, TableRow, TableCell, TableBody, Button } from '../../components/ui';
 
 interface Payslip {
   id: string;
@@ -125,7 +123,9 @@ export const MyPayslipsPage: React.FC = () => {
                   <div
                     key={slip.id}
                     onClick={() => setSelectedSlip(slip)}
-                    className="p-4 rounded-xl border cursor-transition"
+                    className={`p-4 rounded-xl border cursor-pointer transition-all ${
+                      isSelected ? 'border-emerald-500 bg-emerald-50/30' : 'border-slate-200 hover:border-slate-300'
+                    }`}
                   >
                     <div className="flex items-center justify-between">
                       <span className="font-semibold text-slate-900 text-sm">{slip.monthYear}</span>
@@ -140,15 +140,21 @@ export const MyPayslipsPage: React.FC = () => {
           </div>
 
           <div className="lg:col-span-2 bg-white rounded-2xl border border-slate-200 shadow-sm p-6 space-y-6">
-            {selectedSlip ? renderSelectedPayslip(selectedSlip) : null}
+            {selectedSlip ? renderSelectedPayslip(selectedSlip, (m) => showToast(`Downloaded payslip PDF for ${m}`)) : null}
           </div>
         </div>
       ) : null}
+
+      {toastMsg && (
+        <div className="fixed bottom-6 right-6 z-50 px-4 py-3 rounded-2xl bg-zinc-900 text-white text-xs font-semibold shadow-xl border border-zinc-700 animate-fade-in flex items-center gap-2">
+          <span>✓</span> {toastMsg}
+        </div>
+      )}
     </div>
   );
 };
 
-function renderSelectedPayslip(slip: Payslip) {
+function renderSelectedPayslip(slip: Payslip, onDownload: (m: string) => void) {
   return (
     <div>
       <div className="flex items-center justify-between border-b border-slate-100 pb-4">
@@ -161,7 +167,7 @@ function renderSelectedPayslip(slip: Payslip) {
           </h3>
         </div>
         <button
-          onClick={() => handleDownload(slip.monthYear)}
+          onClick={() => onDownload(slip.monthYear)}
           className="px-3.5 py-1.5 text-xs font-semibold bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg transition-colors flex items-center gap-1.5 shadow-sm"
         >
           <span className="w-3.5 h-3.5">{ic('download', 14)}</span>

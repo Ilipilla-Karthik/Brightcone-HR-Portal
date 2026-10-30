@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect } from 'react'
 import { X } from 'lucide-react'
 import { loadLivePayrollEmployees, type EmployeeRef } from './payroll-data'
 import type { StatutoryItem } from './statutory-compliance-types'
@@ -47,7 +47,7 @@ export const AddComplianceItemModal: React.FC<{
       period,
       authority,
       dueDate,
-      owner: owner || undefined,
+      owner: owner || 'Unassigned',
     })
   }
 

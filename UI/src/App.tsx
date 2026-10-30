@@ -215,10 +215,14 @@ const AppLayout: React.FC = () => {
               <Route path="/payroll" element={<PayrollDashboard />} />
               <Route path="/payroll/admin" element={<PayrollAdminPage />} />
               <Route path="/payroll/run" element={<PayrollAdminPage />} />
+              <Route path="/payroll/runs" element={<PayrollAdminPage />} />
               <Route path="/payroll/monthly" element={<MonthlyPayrollPage />} />
               <Route path="/payroll/records" element={<PayslipRecordsPage />} />
               <Route path="/payroll/structures" element={<SalaryStructurePage />} />
+              <Route path="/payroll/salary-structure" element={<SalaryStructurePage />} />
+              <Route path="/payroll/salary-structures" element={<SalaryStructurePage />} />
               <Route path="/payroll/revisions" element={<SalaryRevisionsPage />} />
+              <Route path="/payroll/revisions-appraisals" element={<SalaryRevisionsPage />} />
               <Route path="/payroll/statutory" element={<StatutoryFilings />} />
               <Route path="/payroll/pf-esi" element={<PfEsiCompliancePage />} />
               <Route path="/payroll/compliance" element={<StatutoryCompliancePage />} />

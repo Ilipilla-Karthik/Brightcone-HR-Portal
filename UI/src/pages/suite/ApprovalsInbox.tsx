@@ -70,12 +70,12 @@ export const ApprovalsInbox: React.FC = () => {
           onClick={() => {
             const updated = approveAllPending();
             setItems(updated);
-            showToast('Approved all pending requests');
+            showToast('Approved all shown requests');
           }}
           className="px-3.5 py-2 text-sm font-medium bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg shadow-sm transition-colors flex items-center gap-2 self-start sm:self-auto"
         >
           <span className="w-4 h-4">{ic('check', 16)}</span>
-          Approve All Pending
+          Approve all shown
         </button>
       </div>
 

@@ -1,13 +1,13 @@
 import React from 'react';
 
-type KpiCardProps = {
+export type KpiCardProps = {
   label: string;
   value: string | number;
   subtitle?: string;
   color?: string;
 };
 
-export const RecruitKpiCards: React.FC<KpiCardProps[]> = ({ cards }) => {
+export const RecruitKpiCards: React.FC<{ cards: KpiCardProps[] }> = ({ cards }) => {
   return (
     <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
       {cards.map((card) => (

@@ -11,6 +11,7 @@ export const SuiteDashboard: React.FC = () => {
   const [jobs, setJobs] = useState<Job[]>([]);
   const [pendingApprovals, setPendingApprovals] = useState<number>(() => getPendingApprovalsCount());
   const [approvalsList, setApprovalsList] = useState(() => getApprovals());
+  const [isLauncherOpen, setIsLauncherOpen] = useState(false);
 
   useEffect(() => {
     fetchEmployees().then(setEmployees).catch(() => {});
@@ -19,9 +20,9 @@ export const SuiteDashboard: React.FC = () => {
     setApprovalsList(getApprovals());
   }, []);
 
-  const pendingExpense = approvalsList.filter(i => i.module === 'Expense' && i.status === 'Pending').length;
-  const pendingSign = approvalsList.filter(i => i.module === 'Sign' && i.status === 'Pending').length;
-  const pendingShift = approvalsList.filter(i => i.module === 'Shift' && i.status === 'Pending').length;
+  const pendingExpense = approvalsList.filter((i) => i.module === 'Expense' && i.status === 'Pending').length;
+  const pendingSign = approvalsList.filter((i) => i.module === 'Sign' && i.status === 'Pending').length;
+  const pendingShift = approvalsList.filter((i) => i.module === 'Shift' && i.status === 'Pending').length;
 
   const modules = [
     { name: 'People & Org', desc: 'Workforce records, org chart & asset inventory', path: '/people', color: '#12A58E', icon: ic('users', 22), badge: `${employees.length} Staff` },
@@ -41,7 +42,21 @@ export const SuiteDashboard: React.FC = () => {
           <h1 className="text-2xl font-bold font-['Sora'] tracking-tight text-[var(--text)]">People Plus Suite</h1>
           <p className="text-sm text-[var(--muted)] mt-1">Executive command dashboard across all 9 integrated enterprise modules.</p>
         </div>
-        <div className="flex items-center gap-2.5">
+        <div className="flex items-center gap-2.5 flex-wrap">
+          <button
+            type="button"
+            onClick={() => setIsLauncherOpen(true)}
+            className="btn text-xs font-semibold px-3.5 py-2 flex items-center gap-1.5 border border-[var(--line)] rounded-xl hover:bg-[var(--surface-2)] transition-colors"
+          >
+            {ic('grid', 14)} All apps
+          </button>
+          <button
+            type="button"
+            onClick={() => navigate('/people')}
+            className="btn text-xs font-semibold px-3.5 py-2 flex items-center gap-1.5 border border-[var(--line)] rounded-xl hover:bg-[var(--surface-2)] transition-colors"
+          >
+            {ic('users', 14)} All employees
+          </button>
           <button
             type="button"
             onClick={() => navigate('/suite/approvals')}
@@ -55,15 +70,21 @@ export const SuiteDashboard: React.FC = () => {
 
       {/* KPI Cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <div className="p-5 rounded-2xl bg-[var(--surface)] border border-[var(--line)] shadow-2xs">
+        <div
+          className="p-5 rounded-2xl bg-[var(--surface)] border border-[var(--line)] shadow-2xs cursor-pointer hover:border-[#12A58E] transition-colors"
+          onClick={() => navigate('/people')}
+        >
           <p className="text-xs text-[var(--muted)] font-medium">Total Headcount</p>
           <p className="text-3xl font-bold font-['Sora'] text-[var(--text)] mt-1">{employees.length}</p>
-          <span className="text-[11px] text-emerald-600 font-medium mt-1 block">Live in database</span>
+          <span className="text-[11px] text-emerald-600 font-medium mt-1 block">Live in database →</span>
         </div>
-        <div className="p-5 rounded-2xl bg-[var(--surface)] border border-[var(--line)] shadow-2xs">
+        <div
+          className="p-5 rounded-2xl bg-[var(--surface)] border border-[var(--line)] shadow-2xs cursor-pointer hover:border-[#0F9F6E] transition-colors"
+          onClick={() => navigate('/payroll/admin')}
+        >
           <p className="text-xs text-[var(--muted)] font-medium">Monthly Payroll Run</p>
           <p className="text-3xl font-bold font-['Sora'] text-[#0F9F6E] mt-1">Active</p>
-          <span className="text-[11px] text-[var(--muted)] mt-1 block">Current monthly batch</span>
+          <span className="text-[11px] text-[var(--muted)] mt-1 block">Current monthly batch →</span>
         </div>
         <div
           className="p-5 rounded-2xl bg-[var(--surface)] border border-[var(--line)] shadow-2xs cursor-pointer hover:border-[#0B87FF] transition-colors"
@@ -74,13 +95,16 @@ export const SuiteDashboard: React.FC = () => {
             {pendingApprovals}
           </p>
           <span className="text-[11px] text-[var(--muted)] mt-1 block">
-            {pendingApprovals > 0 ? `${pendingApprovals} requests awaiting review` : 'All requests cleared'}
+            {pendingApprovals > 0 ? `${pendingApprovals} requests awaiting review →` : 'All requests cleared'}
           </span>
         </div>
-        <div className="p-5 rounded-2xl bg-[var(--surface)] border border-[var(--line)] shadow-2xs">
+        <div
+          className="p-5 rounded-2xl bg-[var(--surface)] border border-[var(--line)] shadow-2xs cursor-pointer hover:border-[#6366F1] transition-colors"
+          onClick={() => navigate('/learn/posh')}
+        >
           <p className="text-xs text-[var(--muted)] font-medium">Audit Compliance</p>
           <p className="text-3xl font-bold font-['Sora'] text-[#0B87FF] mt-1">100%</p>
-          <span className="text-[11px] text-emerald-600 font-medium mt-1 block">SOC 2 Type II Aligned</span>
+          <span className="text-[11px] text-emerald-600 font-medium mt-1 block">SOC 2 Type II Aligned →</span>
         </div>
       </div>
 
@@ -121,6 +145,46 @@ export const SuiteDashboard: React.FC = () => {
           ))}
         </div>
       </div>
+
+      {/* All Apps Launcher Modal */}
+      {isLauncherOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-xs p-4">
+          <div className="bg-[var(--surface)] border border-[var(--line)] rounded-2xl max-w-2xl w-full p-6 shadow-2xl relative">
+            <button
+              type="button"
+              onClick={() => setIsLauncherOpen(false)}
+              className="absolute top-4 right-4 text-[var(--muted)] hover:text-[var(--text)]"
+            >
+              {ic('x', 18)}
+            </button>
+            <div className="pb-3 border-b border-[var(--line)]">
+              <h2 className="text-xl font-bold font-['Sora'] text-[var(--text)]">All Enterprise Apps</h2>
+              <p className="text-xs text-[var(--muted)] mt-0.5">Quick launcher for all Brightcone People Plus modules</p>
+            </div>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 py-4">
+              {modules.map((m) => (
+                <button
+                  key={m.name}
+                  type="button"
+                  onClick={() => {
+                    setIsLauncherOpen(false);
+                    navigate(m.path);
+                  }}
+                  className="p-4 rounded-xl border border-[var(--line)] bg-[var(--surface-2)] hover:border-[var(--ac,#0B87FF)] text-left transition-all flex flex-col items-center text-center gap-2"
+                >
+                  <span
+                    className="w-10 h-10 rounded-xl text-white flex items-center justify-center font-bold text-xs shadow-xs"
+                    style={{ background: m.color }}
+                  >
+                    {m.icon}
+                  </span>
+                  <b className="text-xs font-semibold text-[var(--text)]">{m.name}</b>
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

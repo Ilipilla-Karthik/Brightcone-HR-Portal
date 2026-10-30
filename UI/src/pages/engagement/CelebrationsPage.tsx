@@ -3,6 +3,7 @@ import { ic } from '../../components/icons';
 import { CelebrationItem } from './types';
 import { fetchConnectCelebrations, sendCelebrationWish } from '../../services/signConnectApi';
 import { mapCelebrationFromApi } from './apiMapper';
+import { useNotifications } from '../../services/NotificationsContext';
 
 const getInitials = (name: string) => {
   return name
@@ -21,6 +22,7 @@ const getAvatarColor = (name: string) => {
 };
 
 export const CelebrationsPage: React.FC = () => {
+  const { addNotification } = useNotifications();
   const [celebrations, setCelebrations] = useState<CelebrationItem[]>([]);
 
   useEffect(() => {

@@ -1,13 +1,13 @@
 import React from 'react';
 
-type PipelineStageProps = {
+export type PipelineStageProps = {
   stage: string;
   count: number;
   pct: number;
   color: string;
 };
 
-export const RecruitPipelineFunnel: React.FC<PipelineStageProps[]> = ({ stages }) => {
+export const RecruitPipelineFunnel: React.FC<{ stages: PipelineStageProps[] }> = ({ stages }) => {
   return (
     <div className="p-6 rounded-2xl bg-[var(--surface)] border border-[var(--line)] shadow-2xs space-y-4">
       <h3 className="font-['Sora'] text-base font-bold text-[var(--text)]">Hiring Conversion Funnel</h3>
