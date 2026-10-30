@@ -1,5 +1,6 @@
-// Shared types, employee list, mock data and utility helpers for Payroll & Compliance views
-import axios from 'axios'
+// Shared types, employee lookups, records-API helpers and utilities for Payroll views.
+// All data comes from the live backend — there is no seed or fallback data here.
+import { api } from '../../services/api'
 
 export interface EmployeeRef {
   id: string
@@ -9,38 +10,121 @@ export interface EmployeeRef {
   role: string
 }
 
-export const DEMO_EMPLOYEES: EmployeeRef[] = [
-  { id: 'BC-1001', name: 'Ananya Rao', email: 'ananya.rao@brightcone.ai', dept: 'People Ops', role: 'People Ops Lead' },
-  { id: 'BC-1002', name: 'Naresh Vemparala', email: 'naresh.vemparala@brightcone.ai', dept: 'Operations', role: 'VP Operations' },
-  { id: 'BC-1003', name: 'Karthik Reddy', email: 'karthik.reddy@brightcone.ai', dept: 'Engineering', role: 'Principal Architect' },
-  { id: 'BC-1004', name: 'Priya Menon', email: 'priya.menon@brightcone.ai', dept: 'Product', role: 'Head of Product' },
-  { id: 'BC-1005', name: 'Meera Joshi', email: 'meera.joshi@brightcone.ai', dept: 'Finance', role: 'Finance Lead' },
-  { id: 'BC-1006', name: 'Rahul Varma', email: 'rahul.varma@brightcone.ai', dept: 'Engineering', role: 'Backend Engineer' },
-  { id: 'BC-1007', name: 'Sneha Iyer', email: 'sneha.iyer@brightcone.ai', dept: 'Design', role: 'Product Designer' },
-  { id: 'BC-1008', name: 'Arjun Nair', email: 'arjun.nair@brightcone.ai', dept: 'Sales', role: 'Account Executive' },
-  { id: 'BC-1009', name: 'Daniel Brooks', email: 'daniel.brooks@brightcone.ai', dept: 'Engineering', role: 'DevOps Engineer' },
-  { id: 'BC-1010', name: 'Emily Carter', email: 'emily.carter@brightcone.ai', dept: 'Marketing', role: 'Marketing Lead' },
-  { id: 'BC-1011', name: 'Vikram Singh', email: 'vikram.singh@brightcone.ai', dept: 'Engineering', role: 'Security Architect' },
-  { id: 'BC-1012', name: 'Lakshmi Prasad', email: 'lakshmi.prasad@brightcone.ai', dept: 'Support', role: 'Support Specialist' },
-  { id: 'BC-1013', name: 'Farhan Ali', email: 'farhan.ali@brightcone.ai', dept: 'Operations', role: 'Operations Associate' },
-  { id: 'BC-1014', name: 'Divya Kulkarni', email: 'divya.kulkarni@brightcone.ai', dept: 'Marketing', role: 'Growth Specialist' },
-]
+interface EmployeeRow {
+  employee_code?: string
+  id?: string | number
+  full_name?: string
+  fullName?: string
+  name?: string
+  first_name?: string
+  last_name?: string
+  work_email?: string
+  email?: string
+  department?: string
+  dept?: string
+  job_title?: string
+  designation?: string
+  role?: string
+}
 
+const toEmployeeRef = (e: EmployeeRow, idx: number): EmployeeRef => ({
+  id: String(e.employee_code ?? e.id ?? ''),
+  name:
+    e.full_name ||
+    e.fullName ||
+    e.name ||
+    `${e.first_name || ''} ${e.last_name || ''}`.trim() ||
+    `Employee ${idx + 1}`,
+  email: e.work_email || e.email || '',
+  dept: e.department || e.dept || '',
+  role: e.job_title || e.designation || e.role || '',
+})
+
+/** Live employee master list from `GET /api/v1/employees`. Throws on failure. */
 export async function loadLivePayrollEmployees(): Promise<EmployeeRef[]> {
-  try {
-    const res = await axios.get('/api/v1/employees')
-    const list = Array.isArray(res.data) ? res.data : (res.data as any)?.value || []
-    if (list.length > 0) {
-      return list.map((e: any, idx: number) => ({
-        id: e.employee_code || e.id || `BC-${1001 + idx}`,
-        name: e.full_name || e.fullName || e.name || `${e.first_name || ''} ${e.last_name || ''}`.trim() || 'Team Member',
-        email: e.work_email || e.email || `employee${idx + 1}@brightcone.ai`,
-        dept: e.department || 'Engineering',
-        role: e.job_title || e.designation || e.role || 'Software Engineer',
-      }))
-    }
-  } catch {}
-  return DEMO_EMPLOYEES
+  const res = await api.get<EmployeeRow[]>('/employees')
+  const list = Array.isArray(res.data) ? res.data : []
+  return list.map(toEmployeeRef)
+}
+
+/** Employee code → employee lookup, used to show names/departments on record rows. */
+export type EmpDirectory = Record<string, EmployeeRef>
+
+export async function loadEmployeeDirectory(): Promise<EmpDirectory> {
+  const list = await loadLivePayrollEmployees()
+  const dir: EmpDirectory = {}
+  list.forEach((e) => {
+    if (e.id) dir[e.id] = e
+  })
+  return dir
+}
+
+export function empName(dir: EmpDirectory, code: string | undefined): string {
+  return (code && dir[code]?.name) || code || '—'
+}
+
+export function empDept(dir: EmpDirectory, code: string | undefined): string {
+  return (code && dir[code]?.dept) || ''
+}
+
+// ---------------------------------------------------------------------------
+// Generic records API (`/api/v1/rec/{kind}`) — CRUD, archive and CSV export
+// ---------------------------------------------------------------------------
+
+export interface RecRow {
+  code: string
+  archived?: boolean
+  [key: string]: unknown
+}
+
+export async function fetchRecRows(kind: string, archived = false): Promise<RecRow[]> {
+  const res = await api.get<RecRow[]>(`/rec/${kind}`, { params: { archived } })
+  return Array.isArray(res.data) ? res.data : []
+}
+
+export async function fetchRecKindRows(kind: string): Promise<RecRow[]> {
+  const [rows, archivedRows] = await Promise.all([
+    fetchRecRows(kind, false),
+    fetchRecRows(kind, true),
+  ])
+  return [...rows, ...archivedRows]
+}
+
+export async function createRecRow(kind: string, fields: Record<string, unknown>): Promise<RecRow> {
+  const res = await api.post<RecRow>(`/rec/${kind}`, fields)
+  return res.data
+}
+
+export async function patchRecRow(
+  kind: string,
+  code: string,
+  fields: Record<string, unknown>
+): Promise<RecRow> {
+  const res = await api.patch<RecRow>(`/rec/${kind}/${code}`, fields)
+  return res.data
+}
+
+export async function setRecArchived(kind: string, code: string, archived: boolean): Promise<RecRow> {
+  const res = await api.post<RecRow>(`/rec/${kind}/${code}/archive`, { archived })
+  return res.data
+}
+
+/** Downloads `GET /api/v1/rec/{kind}/export` (CSV) using the stored auth token. */
+export async function exportRecCsv(kind: string, filename: string): Promise<void> {
+  const token = localStorage.getItem('token')
+  const response = await fetch(`/api/v1/rec/${kind}/export`, {
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+  })
+  if (!response.ok) throw new Error(`Export failed (${response.status})`)
+  const blob = await response.blob()
+  const url = window.URL.createObjectURL(blob)
+  const link = document.createElement('a')
+  link.href = url
+  link.download = `${filename}.csv`
+  document.body.appendChild(link)
+  link.click()
+  document.body.removeChild(link)
+  window.URL.revokeObjectURL(url)
 }
 
 export function formatINR(val: number | string | undefined | null): string {
@@ -61,4 +145,14 @@ export function exportToCSV(filename: string, headers: string[], rows: (string |
   document.body.appendChild(link)
   link.click()
   document.body.removeChild(link)
+}
+
+export function errorMessage(err: unknown, fallback: string): string {
+  if (err && typeof err === 'object' && 'response' in err) {
+    const response = (err as { response?: { data?: { error?: string; message?: string } } }).response
+    const msg = response?.data?.error || response?.data?.message
+    if (msg) return msg
+  }
+  if (err instanceof Error && err.message) return err.message
+  return fallback
 }

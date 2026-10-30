@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import { X as CloseIcon } from 'lucide-react'
-import { DEMO_EMPLOYEES, loadLivePayrollEmployees, type EmployeeRef } from './payroll-data'
+import { loadLivePayrollEmployees, type EmployeeRef } from './payroll-data'
 import type { SalaryRevisionRecord } from './salary-revisions-types'
 
 export const AddSalaryRevisionModal: React.FC<{
@@ -9,8 +9,8 @@ export const AddSalaryRevisionModal: React.FC<{
   onClose: () => void
   onSave: (record: Omit<SalaryRevisionRecord, 'id'>) => void
 }> = ({ isOpen, editingRecord, onClose, onSave }) => {
-  const [empList, setEmpList] = useState<EmployeeRef[]>(DEMO_EMPLOYEES)
-  const [empId, setEmpId] = useState(DEMO_EMPLOYEES[0].id)
+  const [empList, setEmpList] = useState<EmployeeRef[]>([])
+  const [empId, setEmpId] = useState('')
   const [cycle, setCycle] = useState('Annual Appraisal 2026-27')
   const [rating, setRating] = useState(4)
   const [currentCtc, setCurrentCtc] = useState(1500000)
@@ -22,7 +22,7 @@ export const AddSalaryRevisionModal: React.FC<{
   useEffect(() => {
     loadLivePayrollEmployees().then((data) => {
       if (data && data.length > 0) setEmpList(data)
-    }).catch(() => {})
+    })
   }, [])
 
   useEffect(() => {
@@ -36,7 +36,7 @@ export const AddSalaryRevisionModal: React.FC<{
       setApprover(editingRecord.approver)
       setStatus(editingRecord.status)
     } else {
-      setEmpId(empList[0]?.id || DEMO_EMPLOYEES[0].id)
+      setEmpId(empList[0]?.id || '')
       setCycle('Annual Appraisal 2026-27')
       setRating(4)
       setCurrentCtc(1500000)
@@ -53,11 +53,11 @@ export const AddSalaryRevisionModal: React.FC<{
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
-    const emp = empList.find((x) => x.id === empId) || empList[0] || DEMO_EMPLOYEES[0]
+    const emp = empList.find((x) => x.id === empId) || empList[0]
     onSave({
-      employeeId: emp.id,
-      employeeName: emp.name,
-      dept: emp.dept,
+      employeeId: emp?.id,
+      employeeName: emp?.name,
+      dept: emp?.dept,
       appraisalCycle: cycle,
       rating,
       currentCtc,

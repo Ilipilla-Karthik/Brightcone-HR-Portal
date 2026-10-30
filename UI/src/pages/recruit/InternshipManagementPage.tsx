@@ -1,35 +1,25 @@
 import React, { useState, useEffect } from 'react';
 import { ic } from '../../components/icons';
-import { recruitApi } from '../../services/recruitApi';
+import { internshipsApi } from './recruitApi';
 
-interface Intern {
-  id: string;
-  name: string;
-  college: string;
-  track: string;
-  mentor: string;
-  stipend: string;
-  duration: string;
-  performanceScore: number;
-  ppoStatus: 'Eligible for PPO' | 'PPO Extended' | 'Under Review' | 'Completed';
-}
-
-const STORAGE_KEY = 'brightcone_internships';
+type Intern = Record<string, any>;
 
 export const InternshipManagementPage: React.FC = () => {
   const [interns, setInterns] = useState<Intern[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [toastMsg, setToastMsg] = useState('');
   const [evaluatingIntern, setEvaluatingIntern] = useState<Intern | null>(null);
   const [evalScore, setEvalScore] = useState(4.5);
-  const [evalStatus, setEvalStatus] = useState<'Eligible for PPO' | 'PPO Extended' | 'Under Review'>('Eligible for PPO');
+  const [evalStatus, setEvalStatus] = useState('Eligible for PPO');
 
   const [form, setForm] = useState({
     name: '',
-    college: 'IIT Hyderabad',
-    track: 'AI Research (LLMs)',
-    mentor: 'Karthik Reddy',
-    stipend: '₹40,000 / mo',
+    college: '',
+    track: '',
+    mentor: '',
+    stipend: '',
     duration: '6 Months',
   });
 
@@ -38,117 +28,80 @@ export const InternshipManagementPage: React.FC = () => {
     setTimeout(() => setToastMsg(''), 3000);
   };
 
-  useEffect(() => {
-    loadInterns();
-  }, []);
-
   const loadInterns = async () => {
+    setLoading(true);
+    setError(null);
     try {
-      const data = await recruitApi.getInternships();
-      const savedRaw = localStorage.getItem(STORAGE_KEY);
-      let savedMap: Record<string, any> = {};
-      if (savedRaw) {
-        try { savedMap = JSON.parse(savedRaw); } catch {}
-      }
-
-      const mapped: Intern[] = data.map((d: any) => {
-        const id = d.intern_id || (typeof d.id === 'string' ? d.id : `INT-${d.id}`);
-        const saved = savedMap[id];
-        return {
-          id,
-          name: d.name,
-          college: d.college,
-          track: d.track,
-          mentor: d.mentor,
-          stipend: d.stipend?.replace('?', '₹') || '₹40,000 / mo',
-          duration: d.duration || '6 Months',
-          performanceScore: saved?.performanceScore ?? (d.performance_score || d.performanceScore || 4.2),
-          ppoStatus: (saved?.ppoStatus || d.ppo_status || d.ppoStatus || 'Under Review') as any,
-        };
-      });
-
-      setInterns(mapped);
-    } catch {
-      setInterns([]);
+      const data = await internshipsApi.list();
+      setInterns(data);
+    } catch (e: any) {
+      setError(e?.response?.data?.message || 'Failed to load internships');
+    } finally {
+      setLoading(false);
     }
   };
 
-  const persistInterns = (list: Intern[]) => {
-    setInterns(list);
-    try {
-      const map: Record<string, Intern> = {};
-      list.forEach((i) => { map[i.id] = i; });
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(map));
-    } catch {}
-  };
+  useEffect(() => {
+    loadInterns();
+  }, []);
 
   const handleAdd = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!form.name || !form.college) return;
     try {
-      const created = await recruitApi.createInternship({
+      const created = await internshipsApi.create({
         name: form.name,
         college: form.college,
         track: form.track,
         mentor: form.mentor,
         stipend: form.stipend,
         duration: form.duration,
-        performance_score: 4.2,
         ppo_status: 'Under Review',
       });
-      const intern: Intern = {
-        id: (created as any).intern_id || `INT-0${interns.length + 1}`,
-        name: created.name,
-        college: created.college,
-        track: created.track,
-        mentor: created.mentor,
-        stipend: created.stipend,
-        duration: created.duration,
-        performanceScore: 4.2,
-        ppoStatus: 'Under Review',
-      };
-      persistInterns([...interns, intern]);
+      setInterns((prev) => [...prev, created]);
       setIsModalOpen(false);
-      showToast(`Added intern ${form.name} to database`);
-      setForm({ name: '', college: 'IIT Hyderabad', track: 'AI Research (LLMs)', mentor: 'Karthik Reddy', stipend: '₹40,000 / mo', duration: '6 Months' });
-    } catch {
-      showToast('Saved locally');
+      showToast(`Added intern ${created.name || form.name}`);
+      setForm({ name: '', college: '', track: '', mentor: '', stipend: '', duration: '6 Months' });
+    } catch (err: any) {
+      showToast(err?.response?.data?.message || 'Failed to enroll intern');
     }
   };
 
-  const extendPPO = async (id: string) => {
+  const extendPPO = async (intern: Intern) => {
+    const id = intern.intern_id || intern.id;
     try {
-      await recruitApi.updateInternship(id, { ppo_status: 'PPO Extended' });
-    } catch {}
-    const updated = interns.map((i) => (i.id === id ? { ...i, ppoStatus: 'PPO Extended' as const } : i));
-    persistInterns(updated);
-    showToast('Pre-Placement Offer (PPO) extended to candidate');
+      const updated = await internshipsApi.update(id, { ppo_status: 'PPO Extended' });
+      setInterns((prev) => prev.map((i) => ((i.intern_id || i.id) === id ? updated : i)));
+      showToast('Pre-Placement Offer (PPO) extended to candidate');
+    } catch (err: any) {
+      showToast(err?.response?.data?.message || 'Failed to extend PPO');
+    }
   };
 
   const handleSaveEvaluation = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!evaluatingIntern) return;
-    const id = evaluatingIntern.id;
-
+    const id = evaluatingIntern.intern_id || evaluatingIntern.id;
     try {
-      await recruitApi.updateInternship(id, {
+      const updated = await internshipsApi.update(id, {
         performance_score: evalScore,
         ppo_status: evalStatus,
       });
-    } catch {}
-
-    const updated = interns.map((i) => (i.id === id ? { ...i, performanceScore: evalScore, ppoStatus: evalStatus } : i));
-    persistInterns(updated);
-    showToast(`Project score & evaluation saved for ${evaluatingIntern.name}`);
-    setEvaluatingIntern(null);
+      setInterns((prev) => prev.map((i) => ((i.intern_id || i.id) === id ? updated : i)));
+      showToast(`Project score & evaluation saved for ${updated.name || evaluatingIntern.name}`);
+      setEvaluatingIntern(null);
+    } catch (err: any) {
+      showToast(err?.response?.data?.message || 'Failed to save evaluation');
+    }
   };
 
-  const avgScore = interns.length > 0
-    ? (interns.reduce((acc, i) => acc + i.performanceScore, 0) / interns.length).toFixed(1)
-    : '4.2';
+  const scored = interns.filter((i) => i.performance_score != null);
+  const avgScore = scored.length > 0
+    ? (scored.reduce((acc, i) => acc + Number(i.performance_score), 0) / scored.length).toFixed(1)
+    : '—';
 
   const ppoConversion = interns.length > 0
-    ? `${Math.round((interns.filter((i) => i.ppoStatus === 'PPO Extended').length / interns.length) * 100)}%`
+    ? `${Math.round((interns.filter((i) => i.ppo_status === 'PPO Extended').length / interns.length) * 100)}%`
     : '0%';
 
   return (
@@ -169,17 +122,24 @@ export const InternshipManagementPage: React.FC = () => {
         </button>
       </div>
 
+      {error && (
+        <div className="bg-red-50 border border-red-200 text-red-700 text-xs px-4 py-3 rounded-lg flex items-center justify-between">
+          <span>{error}</span>
+          <button onClick={loadInterns} className="underline font-semibold ml-3">Retry</button>
+        </div>
+      )}
+
       <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
         <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
           <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Active Cohort Size</p>
-          <p className="text-2xl font-bold text-slate-900 mt-1 font-['Sora']">{interns.length} Interns</p>
+          <p className="text-2xl font-bold text-slate-900 mt-1 font-['Sora']">{loading ? '…' : `${interns.length} Interns`}</p>
           <p className="text-[11px] text-blue-600 mt-0.5">Top tier campuses</p>
         </div>
         <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
           <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">PPO Conversion Rate</p>
           <p className="text-2xl font-bold text-emerald-600 mt-1 font-['Sora']">{ppoConversion}</p>
           <p className="text-[11px] text-slate-500 mt-0.5">
-            {interns.filter((i) => i.ppoStatus === 'Eligible for PPO' || i.ppoStatus === 'PPO Extended').length} PPO eligible
+            {interns.filter((i) => i.ppo_status === 'Eligible for PPO' || i.ppo_status === 'PPO Extended').length} PPO eligible
           </p>
         </div>
         <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
@@ -189,8 +149,10 @@ export const InternshipManagementPage: React.FC = () => {
         </div>
         <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
           <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Cohort Duration</p>
-          <p className="text-2xl font-bold text-purple-600 mt-1 font-['Sora']">6 Months</p>
-          <p className="text-[11px] text-slate-500 mt-0.5">Standard Term</p>
+          <p className="text-2xl font-bold text-purple-600 mt-1 font-['Sora']">
+            {interns.length > 0 && interns[0].duration ? interns[0].duration : '—'}
+          </p>
+          <p className="text-[11px] text-slate-500 mt-0.5">Per enrolled term</p>
         </div>
       </div>
 
@@ -210,7 +172,11 @@ export const InternshipManagementPage: React.FC = () => {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 text-slate-700">
-              {interns.length === 0 ? (
+              {loading ? (
+                <tr>
+                  <td colSpan={8} className="py-12 text-center text-slate-400">Loading interns from backend...</td>
+                </tr>
+              ) : interns.length === 0 ? (
                 <tr>
                   <td colSpan={8} className="py-12 text-center text-slate-500">
                     <p className="font-semibold text-slate-700 text-sm">No Active Interns</p>
@@ -219,20 +185,20 @@ export const InternshipManagementPage: React.FC = () => {
                 </tr>
               ) : (
                 interns.map((i) => (
-                  <tr key={i.id} className="hover:bg-slate-50 transition-colors">
+                  <tr key={i.intern_id || i.id} className="hover:bg-slate-50 transition-colors">
                     <td className="py-3 px-4 font-semibold text-slate-900">{i.name}</td>
-                    <td className="py-3 px-4 text-slate-600 font-medium">{i.college}</td>
-                    <td className="py-3 px-4 text-slate-800">{i.track}</td>
-                    <td className="py-3 px-4 text-slate-600 font-medium">{i.mentor}</td>
-                    <td className="py-3 px-4 font-mono font-medium text-slate-700">{i.stipend}</td>
-                    <td className="py-3 px-4 font-bold text-slate-800">{i.performanceScore} / 5</td>
+                    <td className="py-3 px-4 text-slate-600 font-medium">{i.college || '—'}</td>
+                    <td className="py-3 px-4 text-slate-800">{i.track || '—'}</td>
+                    <td className="py-3 px-4 text-slate-600 font-medium">{i.mentor || '—'}</td>
+                    <td className="py-3 px-4 font-mono font-medium text-slate-700">{i.stipend || '—'}</td>
+                    <td className="py-3 px-4 font-bold text-slate-800">{i.performance_score != null ? `${i.performance_score} / 5` : '—'}</td>
                     <td className="py-3 px-4">
                       <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold ${
-                        i.ppoStatus === 'PPO Extended' ? 'bg-emerald-100 text-emerald-800' :
-                        i.ppoStatus === 'Eligible for PPO' ? 'bg-purple-100 text-purple-800' :
+                        i.ppo_status === 'PPO Extended' ? 'bg-emerald-100 text-emerald-800' :
+                        i.ppo_status === 'Eligible for PPO' ? 'bg-purple-100 text-purple-800' :
                         'bg-slate-100 text-slate-800'
                       }`}>
-                        {i.ppoStatus}
+                        {i.ppo_status || 'Under Review'}
                       </span>
                     </td>
                     <td className="py-3 px-4 text-right whitespace-nowrap">
@@ -240,28 +206,21 @@ export const InternshipManagementPage: React.FC = () => {
                         <button
                           onClick={() => {
                             setEvaluatingIntern(i);
-                            setEvalScore(i.performanceScore || 4.5);
-                            setEvalStatus(i.ppoStatus === 'PPO Extended' ? 'PPO Extended' : 'Eligible for PPO');
+                            setEvalScore(Number(i.performance_score) || 4.5);
+                            setEvalStatus(i.ppo_status === 'PPO Extended' ? 'PPO Extended' : 'Eligible for PPO');
                           }}
                           className="px-2 py-1 text-xs text-slate-600 hover:text-slate-900 border border-slate-200 rounded cursor-pointer"
                         >
                           Score
                         </button>
-                        {i.ppoStatus === 'Eligible for PPO' ? (
-                          <button
-                            onClick={() => extendPPO(i.id)}
-                            className="px-2.5 py-1 text-xs font-semibold bg-emerald-600 hover:bg-emerald-700 text-white rounded cursor-pointer"
-                          >
-                            Extend PPO ✓
-                          </button>
-                        ) : i.ppoStatus === 'PPO Extended' ? (
+                        {i.ppo_status === 'PPO Extended' ? (
                           <span className="text-emerald-600 font-semibold text-xs px-2 py-1">PPO Given ✓</span>
                         ) : (
                           <button
-                            onClick={() => extendPPO(i.id)}
+                            onClick={() => extendPPO(i)}
                             className="px-2 py-1 text-xs font-semibold bg-blue-50 text-blue-700 border border-blue-200 hover:bg-blue-100 rounded cursor-pointer"
                           >
-                            Nominate PPO
+                            {i.ppo_status === 'Eligible for PPO' ? 'Extend PPO ✓' : 'Nominate PPO'}
                           </button>
                         )}
                       </div>
@@ -281,7 +240,7 @@ export const InternshipManagementPage: React.FC = () => {
             <div className="flex items-center justify-between pb-3 border-b border-slate-100">
               <div>
                 <h3 className="font-bold text-slate-900 text-sm font-['Sora']">Intern Evaluation & PPO</h3>
-                <p className="text-xs text-slate-500">{evaluatingIntern.name} • {evaluatingIntern.track}</p>
+                <p className="text-xs text-slate-500">{evaluatingIntern.name} • {evaluatingIntern.track || '—'}</p>
               </div>
               <button type="button" onClick={() => setEvaluatingIntern(null)} className="text-slate-400 hover:text-slate-600 cursor-pointer">✕</button>
             </div>
@@ -302,7 +261,7 @@ export const InternshipManagementPage: React.FC = () => {
                 <label className="block font-semibold text-slate-700 mb-1">PPO Eligibility Status</label>
                 <select
                   value={evalStatus}
-                  onChange={(e) => setEvalStatus(e.target.value as any)}
+                  onChange={(e) => setEvalStatus(e.target.value)}
                   className="w-full bg-slate-50 border border-slate-300 rounded-lg p-2 text-slate-800"
                 >
                   <option value="Eligible for PPO">Eligible for PPO</option>
@@ -334,35 +293,38 @@ export const InternshipManagementPage: React.FC = () => {
               </div>
               <div>
                 <label className="block font-semibold text-slate-700 mb-1">Campus / University *</label>
-                <select value={form.college} onChange={(e) => setForm({ ...form, college: e.target.value })} className="w-full bg-slate-50 border border-slate-300 rounded-lg p-2 text-slate-800">
-                  <option value="IIT Hyderabad">IIT Hyderabad</option>
-                  <option value="BITS Pilani (Hyderabad)">BITS Pilani (Hyderabad)</option>
-                  <option value="NIT Warangal">NIT Warangal</option>
-                  <option value="IIIT Hyderabad">IIIT Hyderabad</option>
-                  <option value="IIT Madras">IIT Madras</option>
-                </select>
+                <input required type="text" list="collegeList" placeholder="e.g. IIT Hyderabad" value={form.college} onChange={(e) => setForm({ ...form, college: e.target.value })} className="w-full bg-slate-50 border border-slate-300 rounded-lg p-2 text-slate-800" />
+                <datalist id="collegeList">
+                  {[...new Set(interns.map((i) => i.college).filter(Boolean))].map((c) => (
+                    <option key={c} value={c} />
+                  ))}
+                </datalist>
               </div>
               <div>
                 <label className="block font-semibold text-slate-700 mb-1">Specialization Track</label>
-                <select value={form.track} onChange={(e) => setForm({ ...form, track: e.target.value })} className="w-full bg-slate-50 border border-slate-300 rounded-lg p-2 text-slate-800">
-                  <option value="AI Research (LLMs)">AI Research (LLMs)</option>
-                  <option value="Backend Systems & Rust">Backend Systems & Rust</option>
-                  <option value="Frontend & UI Engineering">Frontend & UI Engineering</option>
-                  <option value="Cloud & Platform DevOps">Cloud & Platform DevOps</option>
-                </select>
+                <input type="text" list="trackList" placeholder="e.g. AI Research (LLMs)" value={form.track} onChange={(e) => setForm({ ...form, track: e.target.value })} className="w-full bg-slate-50 border border-slate-300 rounded-lg p-2 text-slate-800" />
+                <datalist id="trackList">
+                  {[...new Set(interns.map((i) => i.track).filter(Boolean))].map((t) => (
+                    <option key={t} value={t} />
+                  ))}
+                </datalist>
               </div>
               <div>
                 <label className="block font-semibold text-slate-700 mb-1">Assigned Mentor</label>
-                <select value={form.mentor} onChange={(e) => setForm({ ...form, mentor: e.target.value })} className="w-full bg-slate-50 border border-slate-300 rounded-lg p-2 text-slate-800">
-                  <option value="Karthik Reddy">Karthik Reddy (Principal AI Engineer)</option>
-                  <option value="Priya Menon">Priya Menon (Engineering Manager)</option>
-                  <option value="Vikram Malhotra">Vikram Malhotra (DevOps Architect)</option>
-                  <option value="Ananya Rao">Ananya Rao (People Ops)</option>
-                </select>
+                <input type="text" list="mentorList" placeholder="Mentor name" value={form.mentor} onChange={(e) => setForm({ ...form, mentor: e.target.value })} className="w-full bg-slate-50 border border-slate-300 rounded-lg p-2 text-slate-800" />
+                <datalist id="mentorList">
+                  {[...new Set(interns.map((i) => i.mentor).filter(Boolean))].map((m) => (
+                    <option key={m} value={m} />
+                  ))}
+                </datalist>
               </div>
               <div>
                 <label className="block font-semibold text-slate-700 mb-1">Monthly Stipend</label>
-                <input type="text" value={form.stipend} onChange={(e) => setForm({ ...form, stipend: e.target.value })} className="w-full bg-slate-50 border border-slate-300 rounded-lg p-2 text-slate-800" />
+                <input type="text" placeholder="e.g. ₹40,000 / mo" value={form.stipend} onChange={(e) => setForm({ ...form, stipend: e.target.value })} className="w-full bg-slate-50 border border-slate-300 rounded-lg p-2 text-slate-800" />
+              </div>
+              <div>
+                <label className="block font-semibold text-slate-700 mb-1">Duration</label>
+                <input type="text" value={form.duration} onChange={(e) => setForm({ ...form, duration: e.target.value })} className="w-full bg-slate-50 border border-slate-300 rounded-lg p-2 text-slate-800" />
               </div>
             </div>
             <div className="pt-3 border-t border-slate-100 flex items-center justify-end gap-2">

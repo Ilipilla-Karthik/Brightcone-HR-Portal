@@ -16,6 +16,12 @@ export interface EmployeeApiItem {
   shift?: string;
   joined?: string;
   ctc?: number;
+  address?: string;
+  dob?: string;
+  blood_group?: string;
+  emergency_contact_name?: string;
+  emergency_contact_relation?: string;
+  emergency_contact_phone?: string;
 }
 
 export interface DepartmentApiItem {
@@ -26,7 +32,6 @@ export interface DepartmentApiItem {
   description?: string;
   employee_count?: number;
 }
-
 
 export interface VendorApiItem {
   id: number;
@@ -98,157 +103,148 @@ export interface HelpdeskTicketApiItem {
   status?: string;
 }
 
+export interface LeaveRequestApiItem {
+  id: string;
+  request_id: string;
+  employee_code: string;
+  employee_name: string;
+  leave_type: string;
+  from_date: string;
+  to_date: string;
+  days: string;
+  reason: string;
+  status: string;
+  code?: string;
+  archived?: boolean;
+  history?: string;
+  half?: string;
+  approver?: string;
+}
+
+export interface CreateVendorPayload {
+  vendor_code?: string;
+  name: string;
+  category: string;
+  contact_person: string;
+  email: string;
+  phone: string;
+  contract_expiry: string;
+  status: string;
+}
+
+export interface CreateDocumentPayload {
+  doc_id?: string;
+  employee_code?: string;
+  title: string;
+  document_type: string;
+  file_size?: string;
+  issued_date?: string;
+  download_url?: string;
+}
+
+export interface ResignationFormData {
+  employee_code: string;
+  employee_name?: string;
+  reason: string;
+  proposed_last_day: string;
+  notice_period_days?: number;
+}
+
+export interface CreateAssetPayload {
+  asset_id?: string;
+  employee_code?: string;
+  asset_type: string;
+  model_name: string;
+  serial_number: string;
+  status?: string;
+  assigned_date?: string;
+}
+
 function unwrapArray<T>(data: any): T[] {
   if (Array.isArray(data)) return data;
   if (data && Array.isArray(data.value)) return data.value;
   return [];
 }
 
-export async function fetchEmployees(): Promise<EmployeeApiItem[]> {
-  try {
-    const res = await api.get('/employees');
-    return unwrapArray<EmployeeApiItem>(res.data);
-  } catch {
-    return [];
-  }
+async function getArray<T>(url: string): Promise<T[]> {
+  try { const r = await api.get(url); return unwrapArray<T>(r.data); } catch { return []; }
 }
 
-export async function createEmployeeApi(data: Partial<EmployeeApiItem>): Promise<EmployeeApiItem> {
-  const res = await api.post('/employees', data);
-  return res.data;
+async function getData<T = any>(url: string, fallback: T): Promise<T> {
+  try { const r = await api.get(url); return r.data as T; } catch { return fallback; }
 }
 
-export async function fetchDepartments(): Promise<DepartmentApiItem[]> {
-  try {
-    const res = await api.get('/departments');
-    return unwrapArray<DepartmentApiItem>(res.data);
-  } catch {
-    return [];
-  }
+async function postData<T = any>(url: string, data: any, msg: string): Promise<T> {
+  try { const r = await api.post(url, data); return r.data as T; } catch { throw new Error(msg); }
 }
 
-export async function fetchAssets(): Promise<AssetApiItem[]> {
-  try {
-    const res = await api.get('/assets');
-    return unwrapArray<AssetApiItem>(res.data);
-  } catch {
-    return [];
-  }
+async function patchData<T = any>(url: string, data: any, msg: string): Promise<T> {
+  try { const r = await api.patch(url, data); return r.data as T; } catch { throw new Error(msg); }
 }
 
-export async function createAssetApi(data: Partial<AssetApiItem>): Promise<AssetApiItem> {
-  const res = await api.post('/assets', data);
-  return res.data;
+async function deleteData(url: string, msg: string): Promise<void> {
+  try { await api.delete(url); } catch { throw new Error(msg); }
 }
 
-export async function fetchDocuments(): Promise<DocumentApiItem[]> {
-  try {
-    const res = await api.get('/documents');
-    return unwrapArray<DocumentApiItem>(res.data);
-  } catch {
-    return [];
-  }
-}
+// Employee API
+export const fetchEmployees = (): Promise<EmployeeApiItem[]> => getArray<EmployeeApiItem>('/employees');
+export const createEmployeeApi = (data: Partial<EmployeeApiItem>): Promise<EmployeeApiItem> =>
+  postData('/employees', data, 'Failed to create employee');
+export const deleteEmployeeApi = (id: string): Promise<void> =>
+  deleteData(`/employees/${id}`, 'Failed to delete employee');
+export const updateEmployeeApi = (id: string | number, data: Partial<EmployeeApiItem>): Promise<EmployeeApiItem> =>
+  patchData(`/employees/${id}`, data, 'Failed to update employee');
 
-export async function fetchResignations(): Promise<ResignationApiItem[]> {
-  try {
-    const res = await api.get('/resignation');
-    return unwrapArray<ResignationApiItem>(res.data);
-  } catch {
-    return [];
-  }
-}
+// Department API
+export const fetchDepartments = (): Promise<DepartmentApiItem[]> => getArray<DepartmentApiItem>('/departments');
 
-export async function initiateResignationApi(data: {
-  employee_code?: string;
-  employee_name?: string;
-  reason: string;
-  proposed_last_day: string;
-  notice_period_days?: number;
-}): Promise<ResignationApiItem> {
-  const res = await api.post('/resignation/initiate', data);
-  return res.data;
-}
+// Performance API
+export const fetchPerformanceSummary = (): Promise<any> =>
+  getData('/performance/summary', { active: 0, reviews_in_progress: 0, completed_appraisals: 0 });
+export const fetchPerformanceGoals = (): Promise<any[]> => getArray<any>('/performance/goals');
 
-export async function updateResignationStatusApi(id: number, status: string): Promise<ResignationApiItem> {
-  const res = await api.patch(`/resignation/${id}/status`, { status });
-  return res.data;
-}
+// Helpdesk API
+export const fetchHelpdeskTickets = (): Promise<HelpdeskTicketApiItem[]> => getArray<HelpdeskTicketApiItem>('/helpdesk');
+export const createHelpdeskTicketApi = (data: Partial<HelpdeskTicketApiItem>): Promise<HelpdeskTicketApiItem> =>
+  postData('/helpdesk', data, 'Failed to create helpdesk ticket');
 
-export async function fetchPerformanceSummary(): Promise<any> {
-  try {
-    const res = await api.get('/performance/summary');
-    return res.data;
-  } catch {
-    return { active: 8, reviews_in_progress: 3, completed_appraisals: 12 };
-  }
-}
+// Recognition API
+export const fetchRecognitions = (): Promise<RecognitionApiItem[]> => getArray<RecognitionApiItem>('/recognitions');
+export const createRecognitionApi = (data: Partial<RecognitionApiItem>): Promise<RecognitionApiItem> =>
+  postData('/recognitions', data, 'Failed to create recognition');
 
-export async function fetchPerformanceGoals(): Promise<any[]> {
-  try {
-    const res = await api.get('/performance/goals');
-    return unwrapArray<any>(res.data);
-  } catch {
-    return [];
-  }
-}
+// Leave API
+export const fetchLeaveRequests = (): Promise<LeaveRequestApiItem[]> => getArray<LeaveRequestApiItem>('/rec/leaves2');
+export const createLeaveRequestApi = (data: {
+  employee_code: string; leave_type: string; from_date: string; to_date: string; days: string; reason: string;
+}): Promise<LeaveRequestApiItem> => postData('/rec/leaves2', data, 'Failed to create leave request');
 
-export async function fetchHelpdeskTickets(): Promise<HelpdeskTicketApiItem[]> {
-  try {
-    const res = await api.get('/helpdesk');
-    return unwrapArray<HelpdeskTicketApiItem>(res.data);
-  } catch {
-    return [];
-  }
-}
+// Payroll API
+export const fetchPayrollData = (): Promise<any> => getData('/rec/payroll2', []);
 
-export async function createHelpdeskTicketApi(data: Partial<HelpdeskTicketApiItem>): Promise<HelpdeskTicketApiItem> {
-  const res = await api.post('/helpdesk', data);
-  return res.data;
-}
+// Attendance API
+export const fetchAttendanceRecords = (): Promise<any[]> => getArray<any>('/attendance');
 
-export async function fetchVendors(): Promise<VendorApiItem[]> {
-  try {
-    const res = await api.get('/vendors');
-    return unwrapArray<VendorApiItem>(res.data);
-  } catch {
-    return [];
-  }
-}
+// Vendor API
+export const fetchVendors = (): Promise<VendorApiItem[]> => getArray<VendorApiItem>('/vendors');
+export const createVendorApi = (data: CreateVendorPayload): Promise<VendorApiItem> =>
+  postData('/vendors', data, 'Failed to create vendor');
+export const updateVendorApi = (id: string | number, data: Partial<CreateVendorPayload>): Promise<VendorApiItem> =>
+  patchData(`/vendors/${id}`, data, 'Failed to update vendor');
 
-export async function createVendorApi(data: Partial<VendorApiItem>): Promise<VendorApiItem> {
-  const res = await api.post('/vendors', data);
-  return res.data;
-}
+// Document API
+export const fetchDocuments = (): Promise<DocumentApiItem[]> => getArray<DocumentApiItem>('/documents');
+export const createDocumentApi = (data: CreateDocumentPayload): Promise<DocumentApiItem> =>
+  postData('/documents', data, 'Failed to create document');
 
-export async function updateVendorStatusApi(id: number, status: string): Promise<VendorApiItem> {
-  const res = await api.patch(`/vendors/${id}`, { status });
-  return res.data;
-}
+// Resignation API
+export const fetchResignations = (): Promise<ResignationApiItem[]> => getArray<ResignationApiItem>('/resignation');
+export const initiateResignationApi = (data: ResignationFormData): Promise<ResignationApiItem> =>
+  postData('/resignation/initiate', data, 'Failed to initiate resignation');
+export const updateResignationStatusApi = (id: string | number, status: string): Promise<ResignationApiItem> =>
+  patchData(`/resignation/${id}/status`, { status }, 'Failed to update resignation status');
 
-export async function deleteVendorApi(id: number): Promise<void> {
-  await api.delete(`/vendors/${id}`);
-}
-
-export async function fetchRecognitions(): Promise<RecognitionApiItem[]> {
-  try {
-    const res = await api.get('/recognitions');
-    return unwrapArray<RecognitionApiItem>(res.data);
-  } catch {
-    return [];
-  }
-}
-
-export async function createRecognitionApi(data: Partial<RecognitionApiItem>): Promise<RecognitionApiItem> {
-  const res = await api.post('/recognitions', data);
-  return res.data;
-}
-
-export async function deleteRecognitionApi(id: number): Promise<void> {
-  await api.delete(`/recognitions/${id}`);
-}
-
-export async function createDocumentApi(data: Partial<DocumentApiItem>): Promise<DocumentApiItem> {
-  const res = await api.post('/documents', data);
-  return res.data;
-}
+// Asset API
+export const fetchAssets = (): Promise<AssetApiItem[]> => getArray<AssetApiItem>('/assets');
+export const createAssetApi = (data: CreateAssetPayload): Promise<AssetApiItem> =>
+  postData('/assets', data, 'Failed to create asset');

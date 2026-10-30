@@ -3,8 +3,6 @@ import { ic } from '../../components/icons';
 import { CelebrationItem } from './types';
 import { fetchConnectCelebrations, sendCelebrationWish } from '../../services/signConnectApi';
 import { mapCelebrationFromApi } from './apiMapper';
-import { useNotifications } from '../../services/NotificationsContext';
-import { useAuth } from '../../services/authContext';
 
 const getInitials = (name: string) => {
   return name
@@ -32,9 +30,7 @@ export const CelebrationsPage: React.FC = () => {
       })
       .catch(() => {});
   }, []);
-  const { addNotification } = useNotifications();
-  const { user } = useAuth();
-  const currentUser = user?.name || (user?.role === 'employee' ? 'Rahul Varma' : 'Ananya Rao');
+  const currentUser = '';
 
   const [filterType, setFilterType] = useState<string>('All');
   const [searchQuery, setSearchQuery] = useState('');
@@ -63,21 +59,6 @@ export const CelebrationsPage: React.FC = () => {
       category: 'announcement',
       actionUrl: '/engagement/feed',
     });
-
-    // Store in local storage for instant visibility in dashboards
-    try {
-      const existingRaw = localStorage.getItem('brightcone_wishes');
-      const existing = existingRaw ? JSON.parse(existingRaw) : [];
-      const newWish = {
-        id: `wish-${Date.now()}`,
-        recipient: item.name,
-        sender: currentUser,
-        occasion: item.occasion,
-        message: msg,
-        timestamp: 'Just now',
-      };
-      localStorage.setItem('brightcone_wishes', JSON.stringify([newWish, ...existing]));
-    } catch {}
 
     showToast(`Celebration wish successfully delivered to ${item.name}!`);
   };

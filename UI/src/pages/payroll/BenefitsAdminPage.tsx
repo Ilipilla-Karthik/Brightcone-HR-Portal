@@ -9,41 +9,8 @@ export interface BenefitPlan {
   cost: string
 }
 
-const STORAGE_KEY = 'brightcone_benefits_admin';
-
-const INITIAL_PLANS: BenefitPlan[] = [
-  {
-    id: 'BP-01',
-    name: 'Group health insurance',
-    provider: 'Star Health',
-    coverAmount: '₹5,00,000 family floater',
-    cost: 'Company paid',
-  },
-  {
-    id: 'BP-02',
-    name: 'Group term life',
-    provider: 'HDFC Life',
-    coverAmount: '3x annual CTC',
-    cost: 'Company paid',
-  },
-  {
-    id: 'BP-03',
-    name: 'Group personal accident',
-    provider: 'ICICI Lombard',
-    coverAmount: '₹20,00,000',
-    cost: 'Company paid',
-  },
-]
-
 export const BenefitsAdminPage: React.FC = () => {
-  const [plans, setPlans] = useState<BenefitPlan[]>(() => {
-    try {
-      const saved = localStorage.getItem(STORAGE_KEY);
-      return saved ? JSON.parse(saved) : INITIAL_PLANS;
-    } catch {
-      return INITIAL_PLANS;
-    }
-  })
+  const [plans, setPlans] = useState<BenefitPlan[]>([])
   const [modalOpen, setModalOpen] = useState(false)
 
   const loadBenefits = async () => {
@@ -53,7 +20,6 @@ export const BenefitsAdminPage: React.FC = () => {
         const data = await res.json();
         if (Array.isArray(data) && data.length > 0) {
           setPlans(data);
-          localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
           return;
         }
       }
@@ -81,7 +47,6 @@ export const BenefitsAdminPage: React.FC = () => {
     }
     setPlans((prev) => {
       const next = [...prev, newPlan];
-      try { localStorage.setItem(STORAGE_KEY, JSON.stringify(next)); } catch {}
       return next;
     })
     setPlanName('')
@@ -102,7 +67,6 @@ export const BenefitsAdminPage: React.FC = () => {
   const handleDeletePlan = async (id: string) => {
     setPlans((prev) => {
       const next = prev.filter((p) => p.id !== id);
-      try { localStorage.setItem(STORAGE_KEY, JSON.stringify(next)); } catch {}
       return next;
     })
     try {

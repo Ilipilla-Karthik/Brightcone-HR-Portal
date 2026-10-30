@@ -166,8 +166,8 @@ export const CandidateDetailModal: React.FC<CandidateModalProps> = ({
             <p className="font-medium text-[var(--text)] mt-0.5">{candidate.phone}</p>
           </div>
           <div>
-            <span className="text-[11px] text-[var(--muted)] font-medium">Resume Evaluation</span>
-            <p className="font-medium text-[var(--brand)] mt-0.5">Verified PDF attached</p>
+            <span className="text-[11px] text-[var(--muted)] font-medium">Candidate Code</span>
+            <p className="font-medium text-[var(--brand)] mt-0.5 font-mono">{candidate.candidate_code || '—'}</p>
           </div>
         </div>
 

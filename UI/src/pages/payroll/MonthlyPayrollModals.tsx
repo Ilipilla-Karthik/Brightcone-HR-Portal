@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import { X as CloseIcon } from 'lucide-react'
-import { DEMO_EMPLOYEES, formatINR, loadLivePayrollEmployees, type EmployeeRef } from './payroll-data'
+import { formatINR, loadLivePayrollEmployees, type EmployeeRef } from './payroll-data'
 import type { MonthlyPayrollRecord } from './monthly-payroll-types'
 
 export const AddPayrollEntryModal: React.FC<{
@@ -9,8 +9,9 @@ export const AddPayrollEntryModal: React.FC<{
   onClose: () => void
   onSave: (record: Omit<MonthlyPayrollRecord, 'id'>) => void
 }> = ({ isOpen, editingRecord, onClose, onSave }) => {
-  const [empList, setEmpList] = useState<EmployeeRef[]>(DEMO_EMPLOYEES)
-  const [empId, setEmpId] = useState(DEMO_EMPLOYEES[0].id)
+  const [empList, setEmpList] = useState<EmployeeRef[]>([])
+  const [empId, setEmpId] = useState('')
+  const [empError, setEmpError] = useState<string | null>(null)
   const [month, setMonth] = useState('October 2026')
   const [paidDays, setPaidDays] = useState(31)
   const [grossPay, setGrossPay] = useState(145000)
@@ -18,9 +19,9 @@ export const AddPayrollEntryModal: React.FC<{
   const [status, setStatus] = useState<MonthlyPayrollRecord['status']>('Draft')
 
   useEffect(() => {
-    loadLivePayrollEmployees().then((data) => {
-      if (data && data.length > 0) setEmpList(data)
-    }).catch(() => {})
+    loadLivePayrollEmployees()
+      .then(setEmpList)
+      .catch(() => setEmpError('Could not load employees from the server.'))
   }, [])
 
   useEffect(() => {
@@ -32,7 +33,7 @@ export const AddPayrollEntryModal: React.FC<{
       setDeductions(editingRecord.deductions ?? editingRecord.totalDeductions ?? 0)
       setStatus(editingRecord.status)
     } else {
-      setEmpId(empList[0]?.id || DEMO_EMPLOYEES[0].id)
+      setEmpId(empList[0]?.id || '')
       setMonth('October 2026')
       setPaidDays(31)
       setGrossPay(145000)
@@ -47,7 +48,8 @@ export const AddPayrollEntryModal: React.FC<{
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
-    const emp = empList.find((x) => x.id === empId) || empList[0] || DEMO_EMPLOYEES[0]
+    const emp = empList.find((x) => x.id === empId) || empList[0]
+    if (!emp) return
     onSave({
       month,
       employeeId: emp.id,
@@ -76,6 +78,11 @@ export const AddPayrollEntryModal: React.FC<{
           </button>
         </div>
         <form onSubmit={handleSubmit} className="py-4 space-y-3.5">
+          {empError && (
+            <div className="p-3 rounded-xl bg-rose-50 dark:bg-rose-950/30 border border-rose-200 dark:border-rose-800/50 text-xs text-rose-700 dark:text-rose-300">
+              {empError}
+            </div>
+          )}
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1">Employee</label>
@@ -84,6 +91,7 @@ export const AddPayrollEntryModal: React.FC<{
                 onChange={(e) => setEmpId(e.target.value)}
                 className="w-full px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-xs text-slate-900 dark:text-white focus:outline-none focus:border-blue-500"
               >
+                {empList.length === 0 && <option value="">No employees on record</option>}
                 {empList.map((e) => (
                   <option key={e.id} value={e.id}>
                     {e.name} ({e.id})
@@ -147,7 +155,7 @@ export const AddPayrollEntryModal: React.FC<{
             <label className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1">Status</label>
             <select
               value={status}
-              onChange={(e) => setStatus(e.target.value as any)}
+              onChange={(e) => setStatus(e.target.value as MonthlyPayrollRecord['status'])}
               className="w-full px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-xs text-slate-900 dark:text-white focus:outline-none focus:border-blue-500"
             >
               <option value="Draft">Draft</option>
@@ -166,7 +174,8 @@ export const AddPayrollEntryModal: React.FC<{
             </button>
             <button
               type="submit"
-              className="px-5 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-xs font-bold text-white shadow-md cursor-pointer"
+              disabled={empList.length === 0}
+              className="px-5 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-xs font-bold text-white shadow-md cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {editingRecord ? 'Save Changes' : 'Create Entry'}
             </button>
@@ -233,4 +242,3 @@ export const ViewPayrollDetailModal: React.FC<{
     </div>
   )
 }
-

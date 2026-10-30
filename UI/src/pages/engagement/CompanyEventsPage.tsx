@@ -48,11 +48,7 @@ export const CompanyEventsPage: React.FC = () => {
       );
       showToast('Event updated');
     } else {
-      const newEv: EventItem = {
-        id: `EV-${100 + events.length + 1}`,
-        ...eventData,
-      };
-      setEvents([newEv, ...events]);
+      setEvents([eventData, ...events]);
       showToast('Event created');
     }
   };

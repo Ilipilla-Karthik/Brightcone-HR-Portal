@@ -1,23 +1,67 @@
-import React, { useState, useEffect } from 'react'
-import axios from 'axios'
+import React, { useState, useEffect, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Download, Plus, Search, Users, Eye, Edit2, Trash2, CheckCircle2 } from 'lucide-react'
-import { formatINR, exportToCSV } from './payroll-data'
+import { Download, Plus, Search, Users, Eye, Edit2, Trash2, CheckCircle2, AlertCircle } from 'lucide-react'
+import {
+  formatINR,
+  exportRecCsv,
+  fetchRecKindRows,
+  createRecRow,
+  patchRecRow,
+  setRecArchived,
+  loadEmployeeDirectory,
+  empName,
+  empDept,
+  errorMessage,
+  type EmpDirectory,
+  type RecRow,
+} from './payroll-data'
 import type { SalaryStructureRecord } from './salary-structure-types'
-import { INITIAL_STRUCTURES } from './salary-structure-types'
 import { AddSalaryStructureModal, ViewStructureDetailModal } from './SalaryStructureModals'
 
-const STORAGE_KEY = 'brightcone_salary_structures'
+const KIND = 'structure'
+
+const toRecord = (row: RecRow, dir: EmpDirectory): SalaryStructureRecord => {
+  const employeeId = String(row.emp ?? '')
+  const basic = Number(row.basic ?? 0)
+  const hra = Number(row.hra ?? 0)
+  return {
+    id: row.code,
+    employeeId,
+    employeeName: empName(dir, employeeId),
+    dept: empDept(dir, employeeId),
+    effectiveFrom: String(row.eff ?? ''),
+    annualCtc: Number(row.ctc ?? 0),
+    basic,
+    basicMonthly: basic,
+    hra,
+    hraMonthly: hra,
+    specialAllowance: Number(row.special ?? 0),
+    otherAllowance: Number(row.other ?? 0),
+    employerPf: Number(row.pfEr ?? 0),
+    monthlyGross: Number(row.mgross ?? 0),
+    status: (String(row.status ?? 'Draft') as SalaryStructureRecord['status']),
+    isArchived: row.archived === true,
+  }
+}
+
+const toFields = (data: Omit<SalaryStructureRecord, 'id'>): Record<string, unknown> => ({
+  emp: data.employeeId,
+  eff: data.effectiveFrom,
+  ctc: data.annualCtc,
+  basic: data.basicMonthly ?? data.basic,
+  hra: data.hraMonthly ?? data.hra,
+  special: data.specialAllowance,
+  other: data.otherAllowance,
+  pfEr: data.employerPf,
+  mgross: data.monthlyGross,
+  status: data.status,
+})
 
 export const SalaryStructurePage: React.FC = () => {
   const navigate = useNavigate()
-  const [records, setRecords] = useState<SalaryStructureRecord[]>(() => {
-    try {
-      const raw = localStorage.getItem(STORAGE_KEY)
-      if (raw) return JSON.parse(raw)
-    } catch {}
-    return INITIAL_STRUCTURES
-  })
+  const [records, setRecords] = useState<SalaryStructureRecord[]>([])
+  const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState<string | null>(null)
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState('All')
   const [showArchived, setShowArchived] = useState(false)
@@ -25,15 +69,24 @@ export const SalaryStructurePage: React.FC = () => {
   const [editingRecord, setEditingRecord] = useState<SalaryStructureRecord | null>(null)
   const [viewRecord, setViewRecord] = useState<SalaryStructureRecord | null>(null)
   const [toastMessage, setToastMessage] = useState<string | null>(null)
+  const [toastError, setToastError] = useState(false)
+
+  const loadRecords = useCallback(async () => {
+    setLoading(true)
+    setLoadError(null)
+    try {
+      const [rows, dir] = await Promise.all([fetchRecKindRows(KIND), loadEmployeeDirectory()])
+      setRecords(rows.map((r) => toRecord(r, dir)))
+    } catch (err) {
+      setLoadError(errorMessage(err, 'Could not load salary structures.'))
+    } finally {
+      setLoading(false)
+    }
+  }, [])
 
   useEffect(() => {
-    axios.get('/api/payroll/structures').then((res) => {
-      if (res.data && Array.isArray(res.data) && res.data.length > 0) {
-        setRecords(res.data)
-        try { localStorage.setItem(STORAGE_KEY, JSON.stringify(res.data)) } catch {}
-      }
-    }).catch(() => {})
-  }, [])
+    loadRecords()
+  }, [loadRecords])
 
   const activeRecords = records.filter((r) => (showArchived ? r.isArchived : !r.isArchived))
   const filtered = activeRecords.filter((r) => {
@@ -50,44 +103,41 @@ export const SalaryStructurePage: React.FC = () => {
   const supersededCount = records.filter((r) => !r.isArchived && r.status === 'Superseded').length
   const archivedCount = records.filter((r) => r.isArchived).length
 
-  const showToast = (msg: string) => {
+  const showToast = (msg: string, isError = false) => {
     setToastMessage(msg)
+    setToastError(isError)
     setTimeout(() => setToastMessage(null), 3000)
   }
 
   const handleSave = async (data: Omit<SalaryStructureRecord, 'id'>) => {
-    let updatedList: SalaryStructureRecord[] = []
-    if (editingRecord) {
-      updatedList = records.map((r) => (r.id === editingRecord.id ? { ...data, id: editingRecord.id } : r))
-      showToast('Salary structure updated')
-    } else {
-      const newRec: SalaryStructureRecord = {
-        ...data,
-        id: `SS-${Date.now().toString().slice(-4)}`,
-      }
-      updatedList = [
-        newRec,
-        ...records.map((r) =>
-          r.employeeId === data.employeeId && r.status === 'Active' && data.status === 'Active'
-            ? { ...r, status: 'Superseded' as const }
-            : r
-        ),
-      ]
-      showToast(`Salary structure saved for ${data.employeeName}`)
-    }
-    setRecords(updatedList)
     try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(updatedList))
-      await axios.post('/api/payroll/structures', editingRecord ? { ...data, id: editingRecord.id } : data)
-    } catch {}
-    setModalOpen(false)
+      if (editingRecord) {
+        await patchRecRow(KIND, editingRecord.id, toFields(data))
+        showToast('Salary structure updated')
+      } else {
+        await createRecRow(KIND, toFields(data))
+        showToast(`Salary structure saved for ${data.employeeName}`)
+      }
+      setModalOpen(false)
+      await loadRecords()
+    } catch (err) {
+      showToast(errorMessage(err, 'Could not save the salary structure.'), true)
+    }
+  }
+
+  const handleArchive = async (rec: SalaryStructureRecord) => {
+    try {
+      await setRecArchived(KIND, rec.id, !rec.isArchived)
+      showToast(rec.isArchived ? 'Salary structure restored' : 'Salary structure archived')
+      await loadRecords()
+    } catch (err) {
+      showToast(errorMessage(err, 'Could not update the salary structure.'), true)
+    }
   }
 
   const handleExport = () => {
-    exportToCSV(
-      'Salary_Structures',
-      ['ID', 'Employee ID', 'Employee Name', 'Department', 'Effective From', 'Annual CTC (INR)', 'Basic Pay (INR)', 'Monthly Gross (INR)', 'Status'],
-      filtered.map((r) => [r.id, r.employeeId, r.employeeName, r.dept, r.effectiveFrom, r.annualCtc, (r.basicMonthly ?? r.basic), r.monthlyGross, r.status])
+    exportRecCsv(KIND, 'Salary_Structures').catch((err) =>
+      showToast(errorMessage(err, 'Could not export salary structures.'), true)
     )
   }
 
@@ -95,8 +145,8 @@ export const SalaryStructurePage: React.FC = () => {
     <div className="space-y-6 pb-12">
       {/* Toast */}
       {toastMessage && (
-        <div className="fixed bottom-6 right-6 z-50 px-4 py-3 rounded-xl bg-emerald-950 border border-emerald-700 text-emerald-200 text-xs font-semibold shadow-2xl flex items-center gap-2">
-          <CheckCircle2 size={16} className="text-emerald-400" />
+        <div className={`fixed bottom-6 right-6 z-50 px-4 py-3 rounded-xl text-xs font-semibold shadow-2xl flex items-center gap-2 ${toastError ? 'bg-rose-950 border border-rose-700 text-rose-200' : 'bg-emerald-950 border border-emerald-700 text-emerald-200'}`}>
+          {toastError ? <AlertCircle size={16} className="text-rose-400" /> : <CheckCircle2 size={16} className="text-emerald-400" />}
           <span>{toastMessage}</span>
         </div>
       )}
@@ -244,7 +294,19 @@ export const SalaryStructurePage: React.FC = () => {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-200 dark:divide-slate-800/80 text-slate-700 dark:text-slate-300">
-              {filtered.length === 0 ? (
+              {loading ? (
+                <tr>
+                  <td colSpan={7} className="py-12 text-center text-slate-400 dark:text-slate-500">
+                    Loading salary structures…
+                  </td>
+                </tr>
+              ) : loadError ? (
+                <tr>
+                  <td colSpan={7} className="py-12 text-center text-rose-600 dark:text-rose-400">
+                    {loadError}
+                  </td>
+                </tr>
+              ) : filtered.length === 0 ? (
                 <tr>
                   <td colSpan={7} className="py-12 text-center text-slate-400 dark:text-slate-500">
                     No salary structures match the filters.
@@ -294,11 +356,7 @@ export const SalaryStructurePage: React.FC = () => {
                           <Edit2 size={15} />
                         </button>
                         <button
-                          onClick={() =>
-                            setRecords((prev) =>
-                              prev.map((r) => (r.id === rec.id ? { ...r, isArchived: !r.isArchived } : r))
-                            )
-                          }
+                          onClick={() => handleArchive(rec)}
                           title={rec.isArchived ? 'Restore' : 'Archive'}
                           className="p-1.5 rounded-lg text-slate-500 hover:text-rose-600 dark:text-slate-400 dark:hover:text-rose-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
                         >

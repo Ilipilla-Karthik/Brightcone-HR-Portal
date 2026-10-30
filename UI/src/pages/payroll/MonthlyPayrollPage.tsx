@@ -1,14 +1,63 @@
-import React, { useState, useEffect } from 'react'
-import axios from 'axios'
+import React, { useState, useEffect, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Download, Plus, Search, Users, Eye, Edit2, Trash2, CheckCircle2 } from 'lucide-react'
-import { formatINR, exportToCSV } from './payroll-data'
+import { Download, Plus, Search, Users, Eye, Edit2, Trash2, CheckCircle2, AlertCircle } from 'lucide-react'
+import {
+  formatINR,
+  exportRecCsv,
+  fetchRecKindRows,
+  createRecRow,
+  patchRecRow,
+  setRecArchived,
+  loadEmployeeDirectory,
+  empName,
+  empDept,
+  errorMessage,
+  type EmpDirectory,
+  type RecRow,
+} from './payroll-data'
 import type { MonthlyPayrollRecord } from './monthly-payroll-types'
 import { AddPayrollEntryModal, ViewPayrollDetailModal } from './MonthlyPayrollModals'
+
+const KIND = 'payroll2'
+
+const toRecord = (row: RecRow, dir: EmpDirectory): MonthlyPayrollRecord => {
+  const employeeId = String(row.emp ?? '')
+  const ded = Number(row.ded ?? 0)
+  return {
+    id: row.code,
+    month: String(row.month ?? ''),
+    employeeId,
+    employeeName: empName(dir, employeeId),
+    dept: empDept(dir, employeeId),
+    workingDays: Number(row.wdays ?? 0),
+    lopDays: Number(row.lop ?? 0),
+    paidDays: Number(row.pdays ?? 0),
+    grossPay: Number(row.gross ?? 0),
+    totalDeductions: ded,
+    deductions: ded,
+    netPay: Number(row.net ?? 0),
+    status: (String(row.status ?? 'Draft') as MonthlyPayrollRecord['status']),
+    isArchived: row.archived === true,
+  }
+}
+
+const toFields = (data: Omit<MonthlyPayrollRecord, 'id'>): Record<string, unknown> => ({
+  month: data.month,
+  emp: data.employeeId,
+  wdays: data.workingDays,
+  lop: data.lopDays,
+  pdays: data.paidDays,
+  gross: data.grossPay,
+  ded: data.totalDeductions,
+  net: data.netPay,
+  status: data.status,
+})
 
 export const MonthlyPayrollPage: React.FC = () => {
   const navigate = useNavigate()
   const [records, setRecords] = useState<MonthlyPayrollRecord[]>([])
+  const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState<string | null>(null)
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState('All')
   const [showArchived, setShowArchived] = useState(false)
@@ -16,36 +65,24 @@ export const MonthlyPayrollPage: React.FC = () => {
   const [editingRecord, setEditingRecord] = useState<MonthlyPayrollRecord | null>(null)
   const [viewRecord, setViewRecord] = useState<MonthlyPayrollRecord | null>(null)
   const [toastMessage, setToastMessage] = useState<string | null>(null)
+  const [toastError, setToastError] = useState(false)
+
+  const loadRecords = useCallback(async () => {
+    setLoading(true)
+    setLoadError(null)
+    try {
+      const [rows, dir] = await Promise.all([fetchRecKindRows(KIND), loadEmployeeDirectory()])
+      setRecords(rows.map((r) => toRecord(r, dir)))
+    } catch (err) {
+      setLoadError(errorMessage(err, 'Could not load monthly payroll records.'))
+    } finally {
+      setLoading(false)
+    }
+  }, [])
 
   useEffect(() => {
-    try {
-      const raw = localStorage.getItem('brightcone_monthly_payroll')
-      if (raw) setRecords(JSON.parse(raw))
-    } catch {}
-
-    axios
-      .get<Array<{ empId: string; name: string; dept: string; gross: number; pf: number; pt: number; tds: number; net: number }>>('/api/payroll/register')
-      .then((res) => {
-        if (res.data && Array.isArray(res.data) && res.data.length > 0) {
-          const live: MonthlyPayrollRecord[] = res.data.map((r, i) => ({
-            id: `PR-${101 + i}`,
-            month: '2026-10',
-            employeeId: r.empId,
-            employeeName: r.name,
-            dept: r.dept,
-            workingDays: 22,
-            lopDays: 0,
-            paidDays: 22,
-            grossPay: r.gross,
-            totalDeductions: Math.round(r.pf + r.pt + r.tds),
-            netPay: Math.round(r.net),
-            status: i < 4 ? 'Approved' : i < 9 ? 'Processed' : 'Draft',
-          }))
-          setRecords((prev) => (prev.length > 0 ? prev : live))
-        }
-      })
-      .catch(() => {})
-  }, [])
+    loadRecords()
+  }, [loadRecords])
 
   const activeRecords = records.filter((r) => (showArchived ? r.isArchived : !r.isArchived))
   const filtered = activeRecords.filter((r) => {
@@ -63,34 +100,41 @@ export const MonthlyPayrollPage: React.FC = () => {
   const approvedCount = records.filter((r) => !r.isArchived && r.status === 'Approved').length
   const archivedCount = records.filter((r) => r.isArchived).length
 
-  const showToast = (msg: string) => {
+  const showToast = (msg: string, isError = false) => {
     setToastMessage(msg)
+    setToastError(isError)
     setTimeout(() => setToastMessage(null), 3000)
   }
 
-  const handleSave = (data: Omit<MonthlyPayrollRecord, 'id'>) => {
-    let updated: MonthlyPayrollRecord[] = []
-    if (editingRecord) {
-      updated = records.map((r) => (r.id === editingRecord.id ? { ...data, id: editingRecord.id } : r))
-      showToast('Payroll record updated successfully')
-    } else {
-      const newRec: MonthlyPayrollRecord = {
-        ...data,
-        id: `PR-${Date.now().toString().slice(-4)}`,
+  const handleSave = async (data: Omit<MonthlyPayrollRecord, 'id'>) => {
+    try {
+      if (editingRecord) {
+        await patchRecRow(KIND, editingRecord.id, toFields(data))
+        showToast('Payroll record updated successfully')
+      } else {
+        await createRecRow(KIND, toFields(data))
+        showToast(`Payroll entry created for ${data.employeeName}`)
       }
-      updated = [newRec, ...records]
-      showToast(`Payroll entry created for ${data.employeeName}`)
+      setModalOpen(false)
+      await loadRecords()
+    } catch (err) {
+      showToast(errorMessage(err, 'Could not save the payroll record.'), true)
     }
-    setRecords(updated)
-    try { localStorage.setItem('brightcone_monthly_payroll', JSON.stringify(updated)) } catch {}
-    setModalOpen(false)
+  }
+
+  const handleArchive = async (rec: MonthlyPayrollRecord) => {
+    try {
+      await setRecArchived(KIND, rec.id, !rec.isArchived)
+      showToast(rec.isArchived ? 'Payroll record restored' : 'Payroll record archived')
+      await loadRecords()
+    } catch (err) {
+      showToast(errorMessage(err, 'Could not update the payroll record.'), true)
+    }
   }
 
   const handleExport = () => {
-    exportToCSV(
-      'Monthly_Payroll_Register',
-      ['Month', 'Employee ID', 'Employee Name', 'Department', 'Paid Days', 'Gross Pay (INR)', 'Deductions (INR)', 'Net Pay (INR)', 'Status'],
-      filtered.map((r) => [r.month, r.employeeId, r.employeeName, r.dept, r.paidDays, r.grossPay, (r.deductions ?? r.totalDeductions ?? 0), r.netPay, r.status])
+    exportRecCsv(KIND, 'Monthly_Payroll_Register').catch((err) =>
+      showToast(errorMessage(err, 'Could not export the salary register.'), true)
     )
   }
 
@@ -98,8 +142,8 @@ export const MonthlyPayrollPage: React.FC = () => {
     <div className="space-y-6 pb-12">
       {/* Toast Notification */}
       {toastMessage && (
-        <div className="fixed bottom-6 right-6 z-50 px-4 py-3 rounded-xl bg-emerald-950 border border-emerald-700 text-emerald-200 text-xs font-semibold shadow-2xl flex items-center gap-2">
-          <CheckCircle2 size={16} className="text-emerald-400" />
+        <div className={`fixed bottom-6 right-6 z-50 px-4 py-3 rounded-xl text-xs font-semibold shadow-2xl flex items-center gap-2 ${toastError ? 'bg-rose-950 border border-rose-700 text-rose-200' : 'bg-emerald-950 border border-emerald-700 text-emerald-200'}`}>
+          {toastError ? <AlertCircle size={16} className="text-rose-400" /> : <CheckCircle2 size={16} className="text-emerald-400" />}
           <span>{toastMessage}</span>
         </div>
       )}
@@ -248,7 +292,19 @@ export const MonthlyPayrollPage: React.FC = () => {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-200 dark:divide-slate-800/80 text-slate-700 dark:text-slate-300">
-              {filtered.length === 0 ? (
+              {loading ? (
+                <tr>
+                  <td colSpan={8} className="py-12 text-center text-slate-400 dark:text-slate-500">
+                    Loading monthly payroll records…
+                  </td>
+                </tr>
+              ) : loadError ? (
+                <tr>
+                  <td colSpan={8} className="py-12 text-center text-rose-600 dark:text-rose-400">
+                    {loadError}
+                  </td>
+                </tr>
+              ) : filtered.length === 0 ? (
                 <tr>
                   <td colSpan={8} className="py-12 text-center text-slate-400 dark:text-slate-500">
                     No monthly payroll records match the selected filter.
@@ -299,11 +355,7 @@ export const MonthlyPayrollPage: React.FC = () => {
                           <Edit2 size={15} />
                         </button>
                         <button
-                          onClick={() =>
-                            setRecords((prev) =>
-                              prev.map((r) => (r.id === rec.id ? { ...r, isArchived: !r.isArchived } : r))
-                            )
-                          }
+                          onClick={() => handleArchive(rec)}
                           title={rec.isArchived ? 'Restore' : 'Archive'}
                           className="p-1.5 rounded-lg text-slate-500 hover:text-rose-600 dark:text-slate-400 dark:hover:text-rose-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
                         >

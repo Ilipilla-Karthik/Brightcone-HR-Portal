@@ -48,11 +48,7 @@ export const TownhallPage: React.FC = () => {
       );
       showToast('Town hall updated');
     } else {
-      const newTh: TownhallItem = {
-        id: `TH-26-0${townhalls.length + 1}`,
-        ...thData,
-      };
-      setTownhalls([newTh, ...townhalls]);
+      setTownhalls([thData, ...townhalls]);
       showToast('Town hall scheduled');
     }
   };

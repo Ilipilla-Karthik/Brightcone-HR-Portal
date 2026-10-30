@@ -60,12 +60,6 @@ export const FeedbackPage: React.FC = () => {
         loadFeedback();
         showToast('Feedback submitted');
       } catch {
-        const newFb: FeedbackItem = {
-          id: `FB-0${feedbacks.length + 1}`,
-          date: new Date().toISOString().slice(0, 10),
-          ...fbData,
-        };
-        setFeedbacks([newFb, ...feedbacks]);
         showToast('Feedback submitted');
       }
     }

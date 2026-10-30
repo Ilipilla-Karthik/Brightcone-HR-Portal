@@ -58,7 +58,7 @@ export function mapDirectoryEmployeeFromApi(e: any): DirectoryEmployee {
 
 export function mapCelebrationFromApi(c: any): CelebrationItem {
   return {
-    id: c.id || `cel_${Math.random()}`,
+    id: c.id,
     empId: c.empId || c.employee_code || 'BC-1001',
     name: c.name || c.full_name || 'Team Member',
     occasion: (c.occasion as any) || 'Birthday',
@@ -87,7 +87,7 @@ export function mapEventFromApi(ev: any): EventItem {
 
 export function mapTownhallFromApi(th: any): TownhallItem {
   return {
-    id: th.id || `TH-26-${Math.random()}`,
+    id: th.id,
     title: th.title || 'Brightcone All-Hands',
     date: th.date || '2026-10-30',
     time: th.time || '15:00',
@@ -103,7 +103,7 @@ export function mapTownhallFromApi(th: any): TownhallItem {
 
 export function mapFeedbackFromApi(fb: any): FeedbackItem {
   return {
-    id: fb.feedback_id || `FB-0${fb.id}`,
+    id: fb.feedback_id,
     anon: 'Yes',
     cat: (fb.category as any) || 'Workplace',
     text: fb.body || '',

@@ -89,7 +89,7 @@ import { ProbationReviewsPage } from './pages/people/ProbationReviewsPage';
 import { RecruitDashboard } from './pages/recruit/RecruitDashboard';
 import { RecruitAdminPage } from './pages/recruit/RecruitAdminPage';
 import { CandidateTrackerPage } from './pages/recruit/CandidateTrackerPage';
-import { InterviewSchedulingPage } from './pages/recruit/InterviewSchedulingPage';
+import InterviewSchedulingPage from './pages/recruit/InterviewSchedulingPage';
 import { OfferLettersPage } from './pages/recruit/OfferLettersPage';
 import { JoiningFormalitiesPage } from './pages/recruit/JoiningFormalitiesPage';
 import { OnboardingChecklistPage } from './pages/recruit/OnboardingChecklistPage';

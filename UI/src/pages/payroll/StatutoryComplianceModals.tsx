@@ -1,6 +1,6 @@
 ﻿import React, { useState, useEffect } from 'react'
 import { X } from 'lucide-react'
-import { DEMO_EMPLOYEES } from './payroll-data'
+import { loadLivePayrollEmployees, type EmployeeRef } from './payroll-data'
 import type { StatutoryItem } from './statutory-compliance-types'
 
 export const AddComplianceItemModal: React.FC<{
@@ -13,7 +13,14 @@ export const AddComplianceItemModal: React.FC<{
   const [period, setPeriod] = useState('Q3 FY 2026-27')
   const [authority, setAuthority] = useState('Income Tax Department (TRACES)')
   const [dueDate, setDueDate] = useState('2026-10-31')
-  const [owner, setOwner] = useState(DEMO_EMPLOYEES[0].name)
+  const [owner, setOwner] = useState('')
+  const [empList, setEmpList] = useState<EmployeeRef[]>([])
+
+  useEffect(() => {
+    loadLivePayrollEmployees().then((data) => {
+      if (data && data.length > 0) setEmpList(data)
+    })
+  }, [])
 
   useEffect(() => {
     if (editingRecord) {
@@ -21,15 +28,15 @@ export const AddComplianceItemModal: React.FC<{
       setPeriod(editingRecord.period)
       setAuthority(editingRecord.authority)
       setDueDate(editingRecord.dueDate)
-      setOwner(editingRecord.owner)
+      setOwner(editingRecord.owner ?? '')
     } else {
       setItem('TDS Return (Form 24Q)')
       setPeriod('Q3 FY 2026-27')
       setAuthority('Income Tax Department (TRACES)')
       setDueDate('2026-10-31')
-      setOwner(DEMO_EMPLOYEES[0].name)
+      setOwner(empList[0]?.name ?? '')
     }
-  }, [editingRecord, isOpen])
+  }, [editingRecord, isOpen, empList])
 
   if (!isOpen) return null
 
@@ -40,7 +47,7 @@ export const AddComplianceItemModal: React.FC<{
       period,
       authority,
       dueDate,
-      owner,
+      owner: owner || undefined,
     })
   }
 
@@ -108,7 +115,8 @@ export const AddComplianceItemModal: React.FC<{
               onChange={(e) => setOwner(e.target.value)}
               className="w-full px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-xs text-slate-900 dark:text-white focus:outline-none focus:border-blue-500"
             >
-              {DEMO_EMPLOYEES.map((e) => (
+              {empList.length === 0 && <option value="">No employees on record</option>}
+              {empList.map((e) => (
                 <option key={e.id} value={e.name}>
                   {e.name} ({e.dept})
                 </option>

@@ -1,6 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { ic } from '../../components/icons';
-import { recruitApi, Job, Candidate } from '../../services/recruitApi';
+import { jobsApi, candidatesApi } from './recruitApi';
+
+type Job = Record<string, any>;
+type Candidate = Record<string, any>;
 
 export const RecruitAdminPage: React.FC = () => {
   const [jobs, setJobs] = useState<Job[]>([]);
@@ -9,6 +12,7 @@ export const RecruitAdminPage: React.FC = () => {
   const [statusFilter, setStatusFilter] = useState('All');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [toastMsg, setToastMsg] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -28,15 +32,13 @@ export const RecruitAdminPage: React.FC = () => {
 
   const loadData = async () => {
     setLoading(true);
+    setError(null);
     try {
-      const [jobsData, candsData] = await Promise.all([
-        recruitApi.getJobs(),
-        recruitApi.getCandidates(),
-      ]);
+      const [jobsData, candsData] = await Promise.all([jobsApi.list(), candidatesApi.list()]);
       setJobs(jobsData);
       setCandidates(candsData);
-    } catch {
-      showToast('Loaded local fallback data');
+    } catch (e: any) {
+      setError(e?.response?.data?.message || 'Failed to load jobs from backend');
     } finally {
       setLoading(false);
     }
@@ -51,15 +53,15 @@ export const RecruitAdminPage: React.FC = () => {
     if (!newJob.title.trim()) return;
     setIsSubmitting(true);
     try {
-      const created = await recruitApi.createJob({
+      const created = await jobsApi.create({
         title: newJob.title.trim(),
         department: newJob.department,
         location: newJob.location,
         employment_type: newJob.employmentType,
-        referral_bonus: Number(newJob.referralBonus) || 50000,
+        referral_bonus: Number(newJob.referralBonus) || 0,
         description: newJob.description || `Requisition for ${newJob.title} in ${newJob.department}`,
       });
-      setJobs([created, ...jobs]);
+      setJobs((prev) => [created, ...prev]);
       setIsModalOpen(false);
       setNewJob({
         title: '',
@@ -69,35 +71,36 @@ export const RecruitAdminPage: React.FC = () => {
         referralBonus: 50000,
         description: '',
       });
-      showToast(`Job ${created.job_code || created.title} created in PostgreSQL database!`);
-    } catch {
-      showToast('Error saving job to backend database');
+      showToast(`Job ${created.job_code || created.title} created`);
+    } catch (err: any) {
+      showToast(err?.response?.data?.message || 'Failed to save job');
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  const handleDelete = async (jobCode: string) => {
-    if (!window.confirm(`Delete job ${jobCode} from PostgreSQL database?`)) return;
+  const handleDelete = async (job: Job) => {
+    const label = job.job_code || job.title;
+    if (!window.confirm(`Delete job ${label}?`)) return;
     try {
-      await recruitApi.deleteJob(jobCode);
-      setJobs(jobs.filter((j) => j.job_code !== jobCode && j.job_id !== jobCode));
-      showToast(`Job ${jobCode} deleted successfully`);
-    } catch {
-      showToast(`Failed to delete job ${jobCode}`);
+      await jobsApi.remove(job.id || job.job_id || job.job_code);
+      setJobs((prev) => prev.filter((j) => (j.id || j.job_id || j.job_code) !== (job.id || job.job_id || job.job_code)));
+      showToast(`Job ${label} deleted`);
+    } catch (err: any) {
+      showToast(err?.response?.data?.message || `Failed to delete job ${label}`);
     }
   };
 
   const filtered = jobs.filter((j) => {
     const matchSearch =
       !search ||
-      j.title.toLowerCase().includes(search.toLowerCase()) ||
-      j.department.toLowerCase().includes(search.toLowerCase()) ||
+      (j.title || '').toLowerCase().includes(search.toLowerCase()) ||
+      (j.department || '').toLowerCase().includes(search.toLowerCase()) ||
       (j.job_code && j.job_code.toLowerCase().includes(search.toLowerCase()));
 
     const matchStatus =
       statusFilter === 'All' ||
-      j.status.toLowerCase() === statusFilter.toLowerCase() ||
+      (j.status || '').toLowerCase() === statusFilter.toLowerCase() ||
       (statusFilter === 'Published' && (j.status === 'Open' || j.status === 'Published'));
 
     return matchSearch && matchStatus;
@@ -116,7 +119,7 @@ export const RecruitAdminPage: React.FC = () => {
           <div className="flex items-center gap-2">
             <h1 className="text-2xl font-bold font-['Sora'] tracking-tight text-[var(--text)]">Jobs & Requisitions</h1>
             <span className="text-[10px] bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300 px-2 py-0.5 rounded-full font-bold">
-              ● Live PostgreSQL Connected
+              ● Backend Connected
             </span>
           </div>
           <p className="text-sm text-[var(--muted)] mt-1">Open job postings, talent pipelines, and live database requisition tracking.</p>
@@ -140,6 +143,13 @@ export const RecruitAdminPage: React.FC = () => {
           </button>
         </div>
       </div>
+
+      {error && (
+        <div className="bg-red-50 border border-red-200 text-red-700 text-xs px-4 py-3 rounded-xl flex items-center justify-between">
+          <span>{error}</span>
+          <button onClick={loadData} className="underline font-semibold ml-3">Retry</button>
+        </div>
+      )}
 
       {/* Filter and Search Bar */}
       <div className="flex flex-col md:flex-row gap-3 items-center justify-between p-3.5 rounded-2xl bg-[var(--surface)] border border-[var(--line)] shadow-2xs">
@@ -172,7 +182,7 @@ export const RecruitAdminPage: React.FC = () => {
       {/* Jobs Table */}
       <div className="rounded-2xl border border-[var(--line)] bg-[var(--surface)] shadow-2xs overflow-hidden">
         {loading ? (
-          <div className="p-12 text-center text-sm text-[var(--muted)]">Loading live jobs from PostgreSQL database...</div>
+          <div className="p-12 text-center text-sm text-[var(--muted)]">Loading jobs from backend...</div>
         ) : filtered.length === 0 ? (
           <div className="p-12 text-center text-sm text-[var(--muted)]">No job requisitions found matching filters.</div>
         ) : (
@@ -193,27 +203,27 @@ export const RecruitAdminPage: React.FC = () => {
               {filtered.map((j) => {
                 const applicantCount = candidates.filter(
                   (c) =>
-                    (c.job_title && c.job_title.toLowerCase().trim() === j.title.toLowerCase().trim()) ||
+                    (c.job_title && j.title && c.job_title.toLowerCase().trim() === j.title.toLowerCase().trim()) ||
                     (c.job_id && (c.job_id === j.job_id || c.job_id === j.job_code))
                 ).length;
-                const postedDate = j.created_at ? new Date(j.created_at).toISOString().split('T')[0] : '2026-10-23';
+                const postedDate = j.created_at ? new Date(j.created_at).toISOString().split('T')[0] : '—';
 
                 return (
-                  <tr key={j.job_id || j.job_code} className="hover:bg-[var(--surface-2)]/50 transition-colors">
+                  <tr key={j.job_id || j.job_code || j.id} className="hover:bg-[var(--surface-2)]/50 transition-colors">
                     <td className="py-3 px-4">
                       <b className="block text-xs font-semibold text-[var(--text)]">{j.title}</b>
                       <span className="block text-[11px] font-mono text-[var(--muted)]">
-                        {j.job_code} · Posted {postedDate}
+                        {j.job_code || `#${j.id}`} · Posted {postedDate}
                       </span>
                     </td>
                     <td className="py-3 px-4 text-xs font-medium text-[var(--text)]">{j.department}</td>
-                    <td className="py-3 px-4 text-xs font-medium text-[var(--text)]">{j.employment_type || 'Full-time'}</td>
+                    <td className="py-3 px-4 text-xs font-medium text-[var(--text)]">{j.employment_type || '—'}</td>
                     <td className="py-3 px-4 text-xs font-mono font-semibold text-[#7C5CFF]">
                       {applicantCount} Candidates
                     </td>
                     <td className="py-3 px-4 text-xs text-[var(--muted)]">{j.location}</td>
                     <td className="py-3 px-4 text-xs font-mono text-emerald-600 dark:text-emerald-400">
-                      ₹{j.referral_bonus?.toLocaleString('en-IN') || '0'}
+                      ₹{j.referral_bonus != null ? Number(j.referral_bonus).toLocaleString('en-IN') : '0'}
                     </td>
                     <td className="py-3 px-4">
                       <span
@@ -225,15 +235,15 @@ export const RecruitAdminPage: React.FC = () => {
                             : 'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300'
                         }`}
                       >
-                        {j.status}
+                        {j.status || '—'}
                       </span>
                     </td>
                     <td className="py-3 px-4 text-right">
                       <button
                         type="button"
-                        onClick={() => handleDelete(j.job_code)}
+                        onClick={() => handleDelete(j)}
                         className="text-red-500 hover:text-red-700 p-1 rounded-md hover:bg-red-50 dark:hover:bg-red-950 transition-colors"
-                        title={`Delete ${j.job_code} from database`}
+                        title={`Delete ${j.job_code || j.title}`}
                       >
                         {ic('trash', 14)}
                       </button>
@@ -266,31 +276,33 @@ export const RecruitAdminPage: React.FC = () => {
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block font-medium text-[var(--text)] mb-1">Department</label>
-                  <select
+                  <input
+                    type="text"
+                    list="deptList"
                     value={newJob.department}
                     onChange={(e) => setNewJob({ ...newJob, department: e.target.value })}
                     className="w-full px-3 py-2 rounded-xl bg-[var(--surface-2)] border border-[var(--line)] text-[var(--text)] focus:outline-none"
-                  >
-                    <option value="Engineering">Engineering</option>
-                    <option value="AI Research">AI Research</option>
-                    <option value="Product">Product</option>
-                    <option value="People Ops">People Ops</option>
-                    <option value="Sales">Sales</option>
-                    <option value="Design">Design</option>
-                  </select>
+                  />
+                  <datalist id="deptList">
+                    {[...new Set(jobs.map((j) => j.department).filter(Boolean))].map((d) => (
+                      <option key={d} value={d} />
+                    ))}
+                  </datalist>
                 </div>
                 <div>
                   <label className="block font-medium text-[var(--text)] mb-1">Employment Type</label>
-                  <select
+                  <input
+                    type="text"
+                    list="empTypeList"
                     value={newJob.employmentType}
                     onChange={(e) => setNewJob({ ...newJob, employmentType: e.target.value })}
                     className="w-full px-3 py-2 rounded-xl bg-[var(--surface-2)] border border-[var(--line)] text-[var(--text)] focus:outline-none"
-                  >
-                    <option value="Full-time">Full-time</option>
-                    <option value="Contract">Contract</option>
-                    <option value="Internship">Internship</option>
-                    <option value="Remote">Remote</option>
-                  </select>
+                  />
+                  <datalist id="empTypeList">
+                    {[...new Set(jobs.map((j) => j.employment_type).filter(Boolean))].map((t) => (
+                      <option key={t} value={t} />
+                    ))}
+                  </datalist>
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-3">

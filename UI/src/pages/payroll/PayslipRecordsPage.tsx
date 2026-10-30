@@ -1,60 +1,84 @@
-import React, { useState, useEffect } from 'react'
-import axios from 'axios'
+import React, { useState, useEffect, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Download, Plus, Search, Users, Eye, Trash2, CheckCircle2, FileText } from 'lucide-react'
-import { formatINR, exportToCSV } from './payroll-data'
+import { Download, Plus, Search, Users, Eye, Trash2, CheckCircle2, FileText, AlertCircle } from 'lucide-react'
+import {
+  formatINR,
+  exportRecCsv,
+  fetchRecRows,
+  fetchRecKindRows,
+  createRecRow,
+  setRecArchived,
+  loadEmployeeDirectory,
+  empName,
+  empDept,
+  errorMessage,
+  type EmpDirectory,
+  type RecRow,
+} from './payroll-data'
 import type { PayslipRecord } from './payslip-records-types'
 import { AddPayslipModal, ViewPayslipModal, BatchGeneratePayslipModal } from './PayslipRecordsModals'
+
+const KIND = 'payslips2'
+const PAYROLL_KIND = 'payroll2'
+
+const toRecord = (row: RecRow, dir: EmpDirectory): PayslipRecord => {
+  const employeeId = String(row.emp ?? '')
+  return {
+    id: row.code,
+    employeeId,
+    employeeName: empName(dir, employeeId),
+    dept: empDept(dir, employeeId),
+    month: String(row.month ?? ''),
+    gross: Number(row.gross ?? 0),
+    deductions: Number(row.ded ?? 0),
+    netPay: Number(row.net ?? 0),
+    issuedOn: String(row.issued ?? ''),
+    status: (String(row.status ?? 'Generated') as PayslipRecord['status']),
+    isArchived: row.archived === true,
+  }
+}
+
+const toFields = (data: Omit<PayslipRecord, 'id'>): Record<string, unknown> => ({
+  emp: data.employeeId,
+  month: data.month,
+  issued: data.issuedOn,
+  gross: data.gross,
+  ded: data.deductions,
+  net: data.netPay,
+  status: data.status,
+})
 
 export const PayslipRecordsPage: React.FC = () => {
   const navigate = useNavigate()
   const [records, setRecords] = useState<PayslipRecord[]>([])
+  const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState<string | null>(null)
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState('All')
   const [showArchived, setShowArchived] = useState(false)
   const [addModalOpen, setAddModalOpen] = useState(false)
   const [batchModalOpen, setBatchModalOpen] = useState(false)
+  const [generating, setGenerating] = useState(false)
   const [viewRecord, setViewRecord] = useState<PayslipRecord | null>(null)
   const [toastMessage, setToastMessage] = useState<string | null>(null)
+  const [toastError, setToastError] = useState(false)
+
+  const loadRecords = useCallback(async () => {
+    setLoading(true)
+    setLoadError(null)
+    try {
+      const [rows, dir] = await Promise.all([fetchRecKindRows(KIND), loadEmployeeDirectory()])
+      setRecords(rows.map((r) => toRecord(r, dir)))
+    } catch (err) {
+      setLoadError(errorMessage(err, 'Could not load payslip records.'))
+    } finally {
+      setLoading(false)
+    }
+  }, [])
 
   useEffect(() => {
-    try {
-      const raw = localStorage.getItem('brightcone_payslips')
-      if (raw) setRecords(JSON.parse(raw))
-    } catch {}
-
-    axios
-      .get<Array<{ empId: string; name: string; dept: string; gross: number; pf: number; pt: number; tds: number; net: number }>>('/api/payroll/register')
-      .then((res) => {
-        if (res.data && Array.isArray(res.data) && res.data.length > 0) {
-          const live: PayslipRecord[] = res.data.map((r, i) => {
-            const basic = Math.round(r.gross * 0.5)
-            const hra = Math.round(basic * 0.4)
-            const spl = r.gross - (basic + hra)
-            return {
-              id: `PS-${801 + i}`,
-              employeeId: r.empId,
-              employeeName: r.name,
-              dept: r.dept,
-              month: '2026-09',
-              gross: r.gross,
-              deductions: Math.round(r.pf + r.pt + r.tds),
-              netPay: Math.round(r.net),
-              issuedOn: '2026-09-30',
-              status: i < 5 ? 'Acknowledged' : i < 10 ? 'Sent' : 'Generated',
-              basic,
-              hra,
-              specialAllowance: spl,
-              pf: r.pf,
-              pt: r.pt,
-              tds: r.tds,
-            }
-          })
-          setRecords((prev) => (prev.length > 0 ? prev : live))
-        }
-      })
-      .catch(() => {})
-  }, [])
+    loadRecords()
+  }, [loadRecords])
 
   const activeRecords = records.filter((r) => (showArchived ? r.isArchived : !r.isArchived))
   const filtered = activeRecords.filter((r) => {
@@ -72,62 +96,66 @@ export const PayslipRecordsPage: React.FC = () => {
   const ackCount = records.filter((r) => !r.isArchived && r.status === 'Acknowledged').length
   const archivedCount = records.filter((r) => r.isArchived).length
 
-  const showToast = (msg: string) => {
+  const showToast = (msg: string, isError = false) => {
     setToastMessage(msg)
+    setToastError(isError)
     setTimeout(() => setToastMessage(null), 3000)
   }
 
-  const handleSavePayslip = (data: Omit<PayslipRecord, 'id'>) => {
-    const newRec: PayslipRecord = {
-      ...data,
-      id: `SLIP-${Date.now().toString().slice(-4)}`,
+  const handleSavePayslip = async (data: Omit<PayslipRecord, 'id'>) => {
+    try {
+      await createRecRow(KIND, toFields(data))
+      setAddModalOpen(false)
+      showToast(`Payslip created for ${data.employeeName}`)
+      await loadRecords()
+    } catch (err) {
+      showToast(errorMessage(err, 'Could not create the payslip.'), true)
     }
-    const updated = [newRec, ...records]
-    setRecords(updated)
-    try { localStorage.setItem('brightcone_payslips', JSON.stringify(updated)) } catch {}
-    setAddModalOpen(false)
-    showToast(`Payslip created for ${data.employeeName}`)
   }
 
-  const handleBatchGenerate = (month: string, targetEmployees: any[]) => {
-    const newSlips: PayslipRecord[] = targetEmployees.map((emp) => {
-      const gross = 145000
-      const basic = Math.round(gross * 0.5)
-      const hra = Math.round(basic * 0.4)
-      const spl = gross - (basic + hra)
-      const pf = 1800
-      const pt = 200
-      const tds = 8500
-      const totDed = pf + pt + tds
-      return {
-        id: `SLIP-${Date.now().toString().slice(-4)}-${emp.id}`,
-        employeeId: emp.id,
-        employeeName: emp.name,
-        dept: emp.dept,
-        month,
-        gross,
-        deductions: totDed,
-        netPay: gross - totDed,
-        issuedOn: new Date().toISOString().slice(0, 10),
-        status: 'Generated' as const,
-        basic,
-        hra,
-        specialAllowance: spl,
-        pf,
-        pt,
-        tds,
+  const handleBatchGenerate = async (month: string) => {
+    setGenerating(true)
+    try {
+      const lines = await fetchRecRows(PAYROLL_KIND, false)
+      const forMonth = lines.filter((r) => String(r.month ?? '') === month)
+      if (forMonth.length === 0) {
+        showToast(`No payroll lines found for ${month}`, true)
+        return
       }
-    })
-    setRecords((prev) => [...newSlips, ...prev])
-    setBatchModalOpen(false)
-    showToast(`Batch generated ${newSlips.length} payslips for ${month}`)
+      for (const line of forMonth) {
+        await createRecRow(KIND, {
+          emp: line.emp,
+          month: String(line.month ?? ''),
+          issued: new Date().toISOString().slice(0, 10),
+          gross: Number(line.gross ?? 0),
+          ded: Number(line.ded ?? 0),
+          net: Number(line.net ?? 0),
+          status: 'Generated',
+        })
+      }
+      setBatchModalOpen(false)
+      showToast(`Generated ${forMonth.length} payslips for ${month}`)
+      await loadRecords()
+    } catch (err) {
+      showToast(errorMessage(err, 'Could not generate payslips.'), true)
+    } finally {
+      setGenerating(false)
+    }
+  }
+
+  const handleArchive = async (rec: PayslipRecord) => {
+    try {
+      await setRecArchived(KIND, rec.id, !rec.isArchived)
+      showToast(rec.isArchived ? 'Payslip restored' : 'Payslip archived')
+      await loadRecords()
+    } catch (err) {
+      showToast(errorMessage(err, 'Could not update the payslip record.'), true)
+    }
   }
 
   const handleExport = () => {
-    exportToCSV(
-      'Payslip_Records',
-      ['Slip ID', 'Employee ID', 'Employee Name', 'Department', 'Month', 'Gross (INR)', 'Net Pay (INR)', 'Issued On', 'Status'],
-      filtered.map((r) => [r.id, r.employeeId, r.employeeName, r.dept, r.month, r.gross, r.netPay, r.issuedOn, r.status])
+    exportRecCsv(KIND, 'Payslip_Records').catch((err) =>
+      showToast(errorMessage(err, 'Could not export payslip records.'), true)
     )
   }
 
@@ -135,8 +163,8 @@ export const PayslipRecordsPage: React.FC = () => {
     <div className="space-y-6 pb-12">
       {/* Toast */}
       {toastMessage && (
-        <div className="fixed bottom-6 right-6 z-50 px-4 py-3 rounded-xl bg-emerald-950 border border-emerald-700 text-emerald-200 text-xs font-semibold shadow-2xl flex items-center gap-2">
-          <CheckCircle2 size={16} className="text-emerald-400" />
+        <div className={`fixed bottom-6 right-6 z-50 px-4 py-3 rounded-xl text-xs font-semibold shadow-2xl flex items-center gap-2 ${toastError ? 'bg-rose-950 border border-rose-700 text-rose-200' : 'bg-emerald-950 border border-emerald-700 text-emerald-200'}`}>
+          {toastError ? <AlertCircle size={16} className="text-rose-400" /> : <CheckCircle2 size={16} className="text-emerald-400" />}
           <span>{toastMessage}</span>
         </div>
       )}
@@ -288,7 +316,19 @@ export const PayslipRecordsPage: React.FC = () => {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-200 dark:divide-slate-800/80 text-slate-700 dark:text-slate-300">
-              {filtered.length === 0 ? (
+              {loading ? (
+                <tr>
+                  <td colSpan={7} className="py-12 text-center text-slate-400 dark:text-slate-500">
+                    Loading payslip records…
+                  </td>
+                </tr>
+              ) : loadError ? (
+                <tr>
+                  <td colSpan={7} className="py-12 text-center text-rose-600 dark:text-rose-400">
+                    {loadError}
+                  </td>
+                </tr>
+              ) : filtered.length === 0 ? (
                 <tr>
                   <td colSpan={7} className="py-12 text-center text-slate-400 dark:text-slate-500">
                     No payslips match the filters.
@@ -328,11 +368,7 @@ export const PayslipRecordsPage: React.FC = () => {
                           <Eye size={15} />
                         </button>
                         <button
-                          onClick={() =>
-                            setRecords((prev) =>
-                              prev.map((r) => (r.id === rec.id ? { ...r, isArchived: !r.isArchived } : r))
-                            )
-                          }
+                          onClick={() => handleArchive(rec)}
                           title={rec.isArchived ? 'Restore' : 'Archive'}
                           className="p-1.5 rounded-lg text-slate-500 hover:text-rose-600 dark:text-slate-400 dark:hover:text-rose-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
                         >
@@ -348,22 +384,9 @@ export const PayslipRecordsPage: React.FC = () => {
         </div>
       </div>
 
-      <AddPayslipModal
-        isOpen={addModalOpen}
-        onClose={() => setAddModalOpen(false)}
-        onSave={handleSavePayslip}
-      />
-
-      <BatchGeneratePayslipModal
-        isOpen={batchModalOpen}
-        onClose={() => setBatchModalOpen(false)}
-        onGenerate={handleBatchGenerate}
-      />
-
-      <ViewPayslipModal
-        record={viewRecord}
-        onClose={() => setViewRecord(null)}
-      />
+      <AddPayslipModal isOpen={addModalOpen} onClose={() => setAddModalOpen(false)} onSave={handleSavePayslip} />
+      <BatchGeneratePayslipModal isOpen={batchModalOpen} onClose={() => setBatchModalOpen(false)} onGenerate={handleBatchGenerate} generating={generating} />
+      <ViewPayslipModal record={viewRecord} onClose={() => setViewRecord(null)} />
     </div>
   )
 }

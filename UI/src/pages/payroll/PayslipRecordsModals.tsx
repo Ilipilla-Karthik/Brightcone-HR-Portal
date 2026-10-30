@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import { X as CloseIcon, Printer } from 'lucide-react'
-import { DEMO_EMPLOYEES, formatINR, loadLivePayrollEmployees, type EmployeeRef } from './payroll-data'
+import { formatINR, loadLivePayrollEmployees, type EmployeeRef } from './payroll-data'
 import type { PayslipRecord } from './payslip-records-types'
 
 export const AddPayslipModal: React.FC<{
@@ -8,17 +8,18 @@ export const AddPayslipModal: React.FC<{
   onClose: () => void
   onSave: (record: Omit<PayslipRecord, 'id'>) => void
 }> = ({ isOpen, onClose, onSave }) => {
-  const [empList, setEmpList] = useState<EmployeeRef[]>(DEMO_EMPLOYEES)
-  const [empId, setEmpId] = useState(DEMO_EMPLOYEES[0].id)
+  const [empList, setEmpList] = useState<EmployeeRef[]>([])
+  const [empId, setEmpId] = useState('')
+  const [empError, setEmpError] = useState<string | null>(null)
   const [month, setMonth] = useState('October 2026')
   const [gross, setGross] = useState(145000)
   const [deductions, setDeductions] = useState(14440)
   const [status, setStatus] = useState<PayslipRecord['status']>('Generated')
 
   useEffect(() => {
-    loadLivePayrollEmployees().then((data) => {
-      if (data && data.length > 0) setEmpList(data)
-    }).catch(() => {})
+    loadLivePayrollEmployees()
+      .then(setEmpList)
+      .catch(() => setEmpError('Could not load employees from the server.'))
   }, [])
 
   if (!isOpen) return null
@@ -30,7 +31,8 @@ export const AddPayslipModal: React.FC<{
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
-    const emp = empList.find((x) => x.id === empId) || empList[0] || DEMO_EMPLOYEES[0]
+    const emp = empList.find((x) => x.id === empId) || empList[0]
+    if (!emp) return
     onSave({
       employeeId: emp.id,
       employeeName: emp.name,
@@ -60,6 +62,11 @@ export const AddPayslipModal: React.FC<{
           </button>
         </div>
         <form onSubmit={handleSubmit} className="py-4 space-y-3.5">
+          {empError && (
+            <div className="p-3 rounded-xl bg-rose-50 dark:bg-rose-950/30 border border-rose-200 dark:border-rose-800/50 text-xs text-rose-700 dark:text-rose-300">
+              {empError}
+            </div>
+          )}
           <div>
             <label className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1">Employee</label>
             <select
@@ -67,6 +74,7 @@ export const AddPayslipModal: React.FC<{
               onChange={(e) => setEmpId(e.target.value)}
               className="w-full px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-xs text-slate-900 dark:text-white focus:outline-none focus:border-blue-500"
             >
+              {empList.length === 0 && <option value="">No employees on record</option>}
               {empList.map((e) => (
                 <option key={e.id} value={e.id}>
                   {e.name} ({e.id})
@@ -90,7 +98,7 @@ export const AddPayslipModal: React.FC<{
               <label className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1">Status</label>
               <select
                 value={status}
-                onChange={(e) => setStatus(e.target.value as any)}
+                onChange={(e) => setStatus(e.target.value as PayslipRecord['status'])}
                 className="w-full px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-xs text-slate-900 dark:text-white focus:outline-none focus:border-blue-500"
               >
                 <option value="Generated">Generated</option>
@@ -138,7 +146,8 @@ export const AddPayslipModal: React.FC<{
             </button>
             <button
               type="submit"
-              className="px-5 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-xs font-bold text-white shadow-md cursor-pointer"
+              disabled={empList.length === 0}
+              className="px-5 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-xs font-bold text-white shadow-md cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
             >
               Issue Payslip
             </button>
@@ -152,8 +161,9 @@ export const AddPayslipModal: React.FC<{
 export const BatchGeneratePayslipModal: React.FC<{
   isOpen: boolean
   onClose: () => void
-  onGenerate: (month: string, employees: typeof DEMO_EMPLOYEES) => void
-}> = ({ isOpen, onClose, onGenerate }) => {
+  onGenerate: (month: string) => void
+  generating?: boolean
+}> = ({ isOpen, onClose, onGenerate, generating }) => {
   const [month, setMonth] = useState('October 2026')
 
   if (!isOpen) return null
@@ -182,7 +192,7 @@ export const BatchGeneratePayslipModal: React.FC<{
             />
           </div>
           <div className="p-3 bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800/40 rounded-xl text-blue-900 dark:text-blue-300">
-            Will generate and publish payslips for {DEMO_EMPLOYEES.length} active employees on record.
+            Payslips are generated from the monthly payroll lines stored on the server for the selected month.
           </div>
         </div>
         <div className="flex justify-end gap-3 pt-3 border-t border-slate-200 dark:border-slate-800">
@@ -194,10 +204,11 @@ export const BatchGeneratePayslipModal: React.FC<{
             Cancel
           </button>
           <button
-            onClick={() => onGenerate(month, DEMO_EMPLOYEES)}
-            className="px-5 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-xs font-bold text-white shadow-md cursor-pointer"
+            onClick={() => onGenerate(month)}
+            disabled={generating}
+            className="px-5 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-xs font-bold text-white shadow-md cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            Generate All
+            {generating ? 'Generating…' : 'Generate All'}
           </button>
         </div>
       </div>
@@ -277,15 +288,15 @@ export const ViewPayslipModal: React.FC<{
               <div className="space-y-1.5 pt-2 text-slate-600 dark:text-slate-300">
                 <div className="flex justify-between">
                   <span>PF (EE):</span>
-                  <span className="font-mono text-rose-600 dark:text-rose-400">-{formatINR(record.pf || 1800)}</span>
+                  <span className="font-mono text-rose-600 dark:text-rose-400">-{formatINR(record.pf || 0)}</span>
                 </div>
                 <div className="flex justify-between">
                   <span>Prof. Tax:</span>
-                  <span className="font-mono text-rose-600 dark:text-rose-400">-{formatINR(record.pt || 200)}</span>
+                  <span className="font-mono text-rose-600 dark:text-rose-400">-{formatINR(record.pt || 0)}</span>
                 </div>
                 <div className="flex justify-between">
                   <span>TDS (IT):</span>
-                  <span className="font-mono text-rose-600 dark:text-rose-400">-{formatINR(record.tds || 8500)}</span>
+                  <span className="font-mono text-rose-600 dark:text-rose-400">-{formatINR(record.tds || 0)}</span>
                 </div>
               </div>
             </div>
@@ -309,4 +320,3 @@ export const ViewPayslipModal: React.FC<{
     </div>
   )
 }
-
