@@ -1,4 +1,4 @@
-﻿import React from 'react'
+import React from 'react'
 import { useNavigate } from 'react-router-dom'
 import { ListFilter, Banknote, ShieldAlert, FileSpreadsheet, ArrowUpRight } from 'lucide-react'
 import { PayrollStatCards } from './PayrollStatCards'
@@ -39,14 +39,14 @@ export const PayrollAdminDashboard: React.FC = () => {
 
           <div className="flex items-center gap-3 shrink-0">
             <button
-              onClick={() => navigate('/payroll/salary-structure')}
+              onClick={() => navigate('/payroll/runs?tab=register')}
               className="px-4 py-2.5 rounded-xl bg-slate-900/60 hover:bg-slate-900/80 border border-slate-700/60 text-white text-sm font-semibold flex items-center gap-2 transition-all hover:border-slate-500 shadow-sm"
             >
               <ListFilter size={16} className="text-slate-300" />
               <span>Salary register</span>
             </button>
             <button
-              onClick={() => navigate('/payroll/runs')}
+              onClick={() => navigate('/payroll/runs?tab=run')}
               className="px-5 py-2.5 rounded-xl bg-white hover:bg-slate-100 text-slate-950 text-sm font-bold flex items-center gap-2 transition-all shadow-md hover:shadow-lg hover:scale-[1.02] active:scale-[0.98]"
             >
               <Banknote size={17} className="text-emerald-700" />

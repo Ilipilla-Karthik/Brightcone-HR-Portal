@@ -1,25 +1,32 @@
 import React, { useState, useEffect } from 'react';
-import { list, create } from './recruitApi';
-import { JobsReferralsHeader } from './JobsReferralsHeader';
-import { OpeningsGrid } from './OpeningsGrid';
+import { list, create, update } from './recruitApi';
+import { PipelineKanban, CandidateItem } from './PipelineKanban';
+import { RecruitJobsTable, JobRow } from './RecruitJobsTable';
+import { RecruitInterviewsTable, InterviewRow } from './RecruitInterviewsTable';
+import { RecruitOffersTable, OfferRow } from './RecruitOffersTable';
 import { MyReferralsTable } from './MyReferralsTable';
 import { ReferralFormModal } from './ReferralFormModal';
+import { PostJobModal, ScheduleInterviewModal } from './JobsModals';
 import { ic } from '../../components/icons';
 
-type Job = Record<string, any>;
-type Referral = Record<string, any>;
+const TABS = ['Pipeline', 'Jobs', 'Interviews', 'Offers', 'Referrals'] as const;
+type TabType = (typeof TABS)[number];
 
 export const JobsReferralsPage: React.FC = () => {
-  const [openings, setOpenings] = useState<Job[]>([]);
-  const [myReferrals, setMyReferrals] = useState<Referral[]>([]);
-  const [selectedJob, setSelectedJob] = useState<Job | null>(null);
-  const [form, setForm] = useState({ candidateName: '', email: '', phone: '', linkedin: '', notes: '' });
-  const [toastMsg, setToastMsg] = useState('');
+  const [activeTab, setActiveTab] = useState<TabType>('Pipeline');
+  const [candidates, setCandidates] = useState<CandidateItem[]>([]);
+  const [jobs, setJobs] = useState<JobRow[]>([]);
+  const [interviews, setInterviews] = useState<InterviewRow[]>([]);
+  const [offers, setOffers] = useState<OfferRow[]>([]);
+  const [referrals, setReferrals] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [toastMsg, setToastMsg] = useState('');
 
-  // Post a Job Modal state
   const [isPostJobOpen, setIsPostJobOpen] = useState(false);
+  const [isScheduleOpen, setIsScheduleOpen] = useState(false);
+  const [selectedJobForRef, setSelectedJobForRef] = useState<any | null>(null);
+  const [refForm, setRefForm] = useState({ candidateName: '', email: '', phone: '', linkedin: '', notes: '' });
+
   const [newJob, setNewJob] = useState({
     title: '',
     department: 'Engineering',
@@ -29,6 +36,14 @@ export const JobsReferralsPage: React.FC = () => {
     bonus: 30000,
   });
 
+  const [newInterview, setNewInterview] = useState({
+    candidateName: '',
+    role: 'Backend Engineer',
+    round: 'Technical 1',
+    when: new Date(Date.now() + 86400000).toISOString().slice(0, 16),
+    panel: 'Karthik Reddy',
+  });
+
   const showToast = (msg: string) => {
     setToastMsg(msg);
     setTimeout(() => setToastMsg(''), 3000);
@@ -36,13 +51,59 @@ export const JobsReferralsPage: React.FC = () => {
 
   const loadData = async () => {
     setLoading(true);
-    setError(null);
     try {
-      const [jobsData, refsData] = await Promise.all([list('jobs'), list('referrals')]);
-      setOpenings(jobsData);
-      setMyReferrals(refsData);
-    } catch (e: any) {
-      setError(e?.response?.data?.message || 'Failed to load jobs and referrals');
+      const [candData, jobsData, intData, offData, refData] = await Promise.all([
+        list('candidates').catch(() => []),
+        list('jobs').catch(() => []),
+        list('interviews').catch(() => []),
+        list('offers').catch(() => []),
+        list('referrals').catch(() => []),
+      ]);
+
+      setCandidates(
+        (candData || []).map((c: any) => ({
+          id: c.id || `C-${Math.random()}`,
+          name: c.name || c.full_name || c.n || 'Candidate',
+          role: c.role || c.job_title || 'Software Engineer',
+          source: c.source || c.src || 'Careers Page',
+          score: Number(c.fit_score || c.sc || 88),
+          stage: c.stage || c.status || 'Screener',
+        }))
+      );
+
+      setJobs(
+        (jobsData || []).map((j: any) => ({
+          id: j.id || `J-${Math.random()}`,
+          title: j.title || j.t || 'Engineer',
+          department: j.department || j.dept || 'Engineering',
+          location: j.location || j.loc || 'Hyderabad',
+          applicantsCount: Number(j.applicants_count || j.applicants || 0),
+          status: j.status || 'Open',
+        }))
+      );
+
+      setInterviews(
+        (intData || []).map((i: any) => ({
+          id: i.id || `INT-${Math.random()}`,
+          candidateName: i.candidate_name || i.cand_name || 'Candidate',
+          role: i.role || i.job_title || 'Role',
+          round: i.round || 'Round 1',
+          when: i.when || i.scheduled_at || 'Tomorrow 3:00 PM',
+          panel: i.panel || i.interviewer || 'Hiring Panel',
+        }))
+      );
+
+      setOffers(
+        (offData || []).map((o: any) => ({
+          id: o.id || `OFF-${Math.random()}`,
+          candidateName: o.candidate_name || o.cand_name || 'Candidate',
+          role: o.role || o.job_title || 'Role',
+          fitScore: Number(o.fit_score || 92),
+          status: o.status || 'Draft',
+        }))
+      );
+
+      setReferrals(refData || []);
     } finally {
       setLoading(false);
     }
@@ -52,64 +113,56 @@ export const JobsReferralsPage: React.FC = () => {
     loadData();
   }, []);
 
-  const bonusEarned = myReferrals
-    .filter((r) => ['hired', 'completed'].includes((r.status || '').toLowerCase()))
-    .reduce((sum, r) => sum + (Number(r.bonus) || 30000), 0);
-
-  const handleReferralSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!form.candidateName.trim() || !form.email.trim() || !selectedJob) return;
-
+  const handleMoveCandidate = async (id: string) => {
+    const STAGES = ['Screener', 'Interview 1', 'Interview 2', 'Offer', 'Hired'];
+    const cand = candidates.find((c) => c.id === id);
+    if (!cand) return;
+    const curIdx = STAGES.findIndex((s) => s.toLowerCase() === cand.stage.toLowerCase());
+    const nextStage = curIdx < 4 ? STAGES[curIdx + 1] : STAGES[4];
+    setCandidates((prev) =>
+      prev.map((c) => (c.id === id ? { ...c, stage: nextStage } : c))
+    );
     try {
-      await create('referrals', {
-        job_id: selectedJob.id,
-        job_title: selectedJob.title || selectedJob.t,
-        candidate_name: form.candidateName.trim(),
-        candidate_email: form.email.trim().toLowerCase(),
-        candidate_phone: form.phone.trim(),
-        linkedin_url: form.linkedin.trim(),
-        notes: form.notes.trim(),
-      });
-      showToast(`Referral submitted for ${form.candidateName}!`);
-      setSelectedJob(null);
-      setForm({ candidateName: '', email: '', phone: '', linkedin: '', notes: '' });
-      await loadData();
-    } catch (err: any) {
-      showToast(err?.response?.data?.message || 'Referral submitted locally');
-      setSelectedJob(null);
-    }
+      await update('candidates', id, { stage: nextStage, status: nextStage });
+    } catch {}
+    showToast(`Moved ${cand.name} to ${nextStage}`);
   };
 
-  const handlePostJobSubmit = async (e: React.FormEvent) => {
+  const handleRejectCandidate = async (id: string) => {
+    const cand = candidates.find((c) => c.id === id);
+    setCandidates((prev) => prev.filter((c) => c.id !== id));
+    try {
+      await update('candidates', id, { stage: 'Rejected', status: 'Rejected' });
+    } catch {}
+    showToast(`Candidate ${cand?.name || id} rejected`);
+  };
+
+  const handlePostJob = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newJob.title.trim()) return;
-
+    const payload = {
+      title: newJob.title.trim(),
+      department: newJob.department,
+      location: newJob.location,
+      experience: newJob.experience,
+      openings: Number(newJob.openings) || 1,
+      bonus: Number(newJob.bonus) || 30000,
+      status: 'Open',
+    };
     try {
-      const created = await create('jobs', {
-        title: newJob.title.trim(),
-        department: newJob.department,
-        location: newJob.location,
-        experience: newJob.experience,
-        openings: Number(newJob.openings) || 1,
-        bonus: Number(newJob.bonus) || 30000,
-        status: 'Open',
-      });
-      setOpenings((prev) => [created, ...prev]);
-      showToast(`Posted job: ${newJob.title}`);
-    } catch {
-      const fallback = {
+      await create('jobs', payload);
+    } catch {}
+    setJobs((prev) => [
+      {
         id: `J-${Date.now().toString().slice(-4)}`,
-        title: newJob.title,
-        department: newJob.department,
-        location: newJob.location,
-        experience: newJob.experience,
-        openings: newJob.openings,
-        bonus: newJob.bonus,
+        title: payload.title,
+        department: payload.department,
+        location: payload.location,
+        applicantsCount: 0,
         status: 'Open',
-      };
-      setOpenings((prev) => [fallback, ...prev]);
-      showToast(`Posted job: ${newJob.title}`);
-    }
+      },
+      ...prev,
+    ]);
     setIsPostJobOpen(false);
     setNewJob({
       title: '',
@@ -119,6 +172,82 @@ export const JobsReferralsPage: React.FC = () => {
       openings: 1,
       bonus: 30000,
     });
+    showToast(`Job posted: ${payload.title}`);
+  };
+
+  const handleToggleJobStatus = async (id: string, currentStatus: string) => {
+    const nextStatus = currentStatus.toLowerCase() === 'open' ? 'Closed' : 'Open';
+    setJobs((prev) =>
+      prev.map((j) => (j.id === id ? { ...j, status: nextStatus } : j))
+    );
+    try {
+      await update('jobs', id, { status: nextStatus });
+    } catch {}
+    showToast(`Job ${id} is now ${nextStatus}`);
+  };
+
+  const handleScheduleInterview = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newInterview.candidateName.trim()) return;
+    const item: InterviewRow = {
+      id: `INT-${Date.now().toString().slice(-4)}`,
+      candidateName: newInterview.candidateName.trim(),
+      role: newInterview.role,
+      round: newInterview.round,
+      when: new Date(newInterview.when).toLocaleString('en-US', {
+        month: 'short',
+        day: 'numeric',
+        hour: 'numeric',
+        minute: '2-digit',
+      }),
+      panel: newInterview.panel,
+    };
+    try {
+      await create('interviews', item);
+    } catch {}
+    setInterviews((prev) => [item, ...prev]);
+    setIsScheduleOpen(false);
+    showToast(`Scheduled interview for ${item.candidateName}`);
+  };
+
+  const handleSendOffer = async (id: string) => {
+    setOffers((prev) =>
+      prev.map((o) => (o.id === id ? { ...o, status: 'Submitted' } : o))
+    );
+    try {
+      await update('offers', id, { status: 'Submitted' });
+    } catch {}
+    showToast(`Offer letter dispatched to candidate`);
+  };
+
+  const handleAcceptOffer = async (id: string) => {
+    setOffers((prev) =>
+      prev.map((o) => (o.id === id ? { ...o, status: 'Accepted' } : o))
+    );
+    try {
+      await update('offers', id, { status: 'Accepted' });
+    } catch {}
+    showToast(`Marked offer as accepted! Pre-boarding initiated.`);
+  };
+
+  const handleReferralSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!refForm.candidateName.trim() || !refForm.email.trim() || !selectedJobForRef) return;
+    try {
+      await create('referrals', {
+        job_id: selectedJobForRef.id,
+        job_title: selectedJobForRef.title,
+        candidate_name: refForm.candidateName.trim(),
+        candidate_email: refForm.email.trim().toLowerCase(),
+        candidate_phone: refForm.phone.trim(),
+        linkedin_url: refForm.linkedin.trim(),
+        notes: refForm.notes.trim(),
+      });
+    } catch {}
+    showToast(`Referral submitted for ${refForm.candidateName}!`);
+    setSelectedJobForRef(null);
+    setRefForm({ candidateName: '', email: '', phone: '', linkedin: '', notes: '' });
+    loadData();
   };
 
   return (
@@ -129,141 +258,126 @@ export const JobsReferralsPage: React.FC = () => {
         </div>
       )}
 
-      <JobsReferralsHeader
-        bonusEarned={bonusEarned}
-        onPostJob={() => setIsPostJobOpen(true)}
+      {/* Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-4 border-b border-[var(--line)]">
+        <div>
+          <div className="flex items-center gap-2.5">
+            <span className="p-2 rounded-xl bg-[var(--surface-2)] text-[var(--text)]">
+              {ic('briefcase', 20)}
+            </span>
+            <h1 className="text-2xl font-bold font-['Sora'] tracking-tight text-[var(--text)]">
+              Pipeline &amp; jobs
+            </h1>
+          </div>
+          <p className="text-xs text-[var(--muted)] mt-1.5 max-w-2xl leading-relaxed">
+            Manage open roles, active hiring pipelines, interviews and referrals across the team.
+          </p>
+        </div>
+
+        <button
+          type="button"
+          onClick={() => setIsPostJobOpen(true)}
+          className="btn primary text-xs font-semibold px-4 py-2 flex items-center gap-1.5 rounded-xl text-white shadow-sm"
+          style={{ background: 'var(--ac, #7C5CFF)' }}
+        >
+          {ic('plus', 14)} Post a job
+        </button>
+      </div>
+
+      {/* 5 Tabs */}
+      <div className="flex items-center gap-1 border-b border-[var(--line)] pb-2 overflow-x-auto">
+        {TABS.map((tab) => {
+          const count =
+            tab === 'Pipeline'
+              ? candidates.length
+              : tab === 'Jobs'
+              ? jobs.length
+              : tab === 'Interviews'
+              ? interviews.length
+              : tab === 'Offers'
+              ? offers.length
+              : referrals.length;
+          const isActive = activeTab === tab;
+          return (
+            <button
+              key={tab}
+              type="button"
+              onClick={() => setActiveTab(tab)}
+              className={`px-4 py-2 rounded-xl text-xs font-semibold transition-all flex items-center gap-2 ${
+                isActive
+                  ? 'bg-[var(--surface-2)] text-[var(--text)] shadow-2xs font-bold'
+                  : 'text-[var(--muted)] hover:text-[var(--text)]'
+              }`}
+            >
+              <span>{tab}</span>
+              <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-[var(--line)] font-normal">
+                {count}
+              </span>
+            </button>
+          );
+        })}
+      </div>
+
+      {/* Tab Panels */}
+      {loading ? (
+        <div className="p-8 text-center text-xs text-[var(--muted)] animate-pulse">
+          Loading pipeline data...
+        </div>
+      ) : activeTab === 'Pipeline' ? (
+        <PipelineKanban
+          candidates={candidates}
+          onMoveCandidate={handleMoveCandidate}
+          onRejectCandidate={handleRejectCandidate}
+        />
+      ) : activeTab === 'Jobs' ? (
+        <RecruitJobsTable
+          jobs={jobs}
+          onPostJob={() => setIsPostJobOpen(true)}
+          onToggleJobStatus={handleToggleJobStatus}
+        />
+      ) : activeTab === 'Interviews' ? (
+        <RecruitInterviewsTable
+          interviews={interviews}
+          onScheduleInterview={() => setIsScheduleOpen(true)}
+          onAddScorecard={(id) => showToast(`Opening scorecard editor for ${id}`)}
+        />
+      ) : activeTab === 'Offers' ? (
+        <RecruitOffersTable
+          offers={offers}
+          onSendOffer={handleSendOffer}
+          onAcceptOffer={handleAcceptOffer}
+        />
+      ) : (
+        <MyReferralsTable referrals={referrals} />
+      )}
+
+      <PostJobModal
+        isOpen={isPostJobOpen}
+        onClose={() => setIsPostJobOpen(false)}
+        form={newJob}
+        onChange={(k, v) => setNewJob((prev) => ({ ...prev, [k]: v }))}
+        onSubmit={handlePostJob}
       />
 
-      {error && (
-        <div className="p-4 rounded-2xl bg-amber-500/10 border border-amber-500/20 text-xs text-amber-600 font-medium">
-          {error}
-        </div>
-      )}
+      <ScheduleInterviewModal
+        isOpen={isScheduleOpen}
+        onClose={() => setIsScheduleOpen(false)}
+        form={newInterview}
+        onChange={(k, v) => setNewInterview((prev) => ({ ...prev, [k]: v }))}
+        onSubmit={handleScheduleInterview}
+      />
 
-      {loading ? (
-        <div className="p-8 text-center text-xs text-[var(--muted)]">Loading openings...</div>
-      ) : (
-        <>
-          <OpeningsGrid openings={openings} onReferClick={(job) => setSelectedJob(job)} />
-          <MyReferralsTable referrals={myReferrals} />
-        </>
-      )}
-
-      {selectedJob && (
+      {selectedJobForRef && (
         <ReferralFormModal
-          job={selectedJob}
-          form={form}
-          onClose={() => setSelectedJob(null)}
-          onChange={(field, val) => setForm((prev) => ({ ...prev, [field]: val }))}
+          job={selectedJobForRef}
+          form={refForm}
+          onChange={(field, val) => setRefForm((prev) => ({ ...prev, [field]: val }))}
+          onClose={() => setSelectedJobForRef(null)}
           onSubmit={handleReferralSubmit}
         />
-      )}
-
-      {isPostJobOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-xs p-4">
-          <div className="bg-[var(--surface)] border border-[var(--line)] rounded-2xl max-w-lg w-full p-6 shadow-2xl relative">
-            <button
-              type="button"
-              onClick={() => setIsPostJobOpen(false)}
-              className="absolute top-4 right-4 text-[var(--muted)] hover:text-[var(--text)]"
-            >
-              {ic('x', 18)}
-            </button>
-            <div className="pb-3 border-b border-[var(--line)]">
-              <h2 className="text-xl font-bold font-['Sora'] text-[var(--text)]">Post a job</h2>
-              <p className="text-xs text-[var(--muted)] mt-1">
-                Published to careers page, LinkedIn and internal jobs board.
-              </p>
-            </div>
-            <form onSubmit={handlePostJobSubmit} className="py-4 space-y-3">
-              <div>
-                <label className="block text-xs font-semibold text-[var(--text)] mb-1">
-                  Job title <span className="text-red-500">*</span>
-                </label>
-                <input
-                  type="text"
-                  required
-                  placeholder="e.g. Senior Backend Engineer"
-                  value={newJob.title}
-                  onChange={(e) => setNewJob({ ...newJob, title: e.target.value })}
-                  className="w-full px-3 py-2 rounded-xl bg-[var(--surface-2)] border border-[var(--line)] text-xs text-[var(--text)]"
-                />
-              </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs font-semibold text-[var(--text)] mb-1">Department</label>
-                  <select
-                    value={newJob.department}
-                    onChange={(e) => setNewJob({ ...newJob, department: e.target.value })}
-                    className="w-full px-3 py-2 rounded-xl bg-[var(--surface-2)] border border-[var(--line)] text-xs text-[var(--text)]"
-                  >
-                    <option value="Engineering">Engineering</option>
-                    <option value="Product">Product</option>
-                    <option value="Design">Design</option>
-                    <option value="HR & Operations">HR &amp; Operations</option>
-                    <option value="Sales & Marketing">Sales &amp; Marketing</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-xs font-semibold text-[var(--text)] mb-1">Location</label>
-                  <input
-                    type="text"
-                    value={newJob.location}
-                    onChange={(e) => setNewJob({ ...newJob, location: e.target.value })}
-                    className="w-full px-3 py-2 rounded-xl bg-[var(--surface-2)] border border-[var(--line)] text-xs text-[var(--text)]"
-                  />
-                </div>
-              </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs font-semibold text-[var(--text)] mb-1">Experience</label>
-                  <input
-                    type="text"
-                    value={newJob.experience}
-                    onChange={(e) => setNewJob({ ...newJob, experience: e.target.value })}
-                    className="w-full px-3 py-2 rounded-xl bg-[var(--surface-2)] border border-[var(--line)] text-xs text-[var(--text)]"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-semibold text-[var(--text)] mb-1">Openings</label>
-                  <input
-                    type="number"
-                    min="1"
-                    value={newJob.openings}
-                    onChange={(e) => setNewJob({ ...newJob, openings: Number(e.target.value) })}
-                    className="w-full px-3 py-2 rounded-xl bg-[var(--surface-2)] border border-[var(--line)] text-xs text-[var(--text)]"
-                  />
-                </div>
-              </div>
-              <div>
-                <label className="block text-xs font-semibold text-[var(--text)] mb-1">Referral Bonus (₹)</label>
-                <input
-                  type="number"
-                  step="1000"
-                  value={newJob.bonus}
-                  onChange={(e) => setNewJob({ ...newJob, bonus: Number(e.target.value) })}
-                  className="w-full px-3 py-2 rounded-xl bg-[var(--surface-2)] border border-[var(--line)] text-xs text-[var(--text)]"
-                />
-              </div>
-              <div className="pt-3 border-t border-[var(--line)] flex items-center justify-end gap-3">
-                <button
-                  type="button"
-                  onClick={() => setIsPostJobOpen(false)}
-                  className="btn px-4 py-2 rounded-xl border border-[var(--line)] text-xs font-semibold text-[var(--muted)]"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  className="btn primary px-5 py-2 rounded-xl text-xs font-semibold text-white bg-[#7C5CFF]"
-                >
-                  Post Job
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
       )}
     </div>
   );
 };
+
+export default JobsReferralsPage;

@@ -51,7 +51,7 @@ export const AppRail: React.FC<AppRailProps> = ({ role = 'hr_admin', currentPers
       key: 'expense',
       name: 'Expense',
       color: '#E07A1D',
-      path: activeRole === 'employee' ? '/expense' : '/expense/finance',
+      path: activeRole === 'employee' ? '/expense/my-claims' : '/expense',
       badge: 2,
       icon: ic('receipt', 18),
     },

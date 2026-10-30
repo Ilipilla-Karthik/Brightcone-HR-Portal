@@ -129,15 +129,20 @@ export const getSidebarSections = (p: string, role: 'hr_admin' | 'employee'): Na
   // 4. Expense Module
   if (p.startsWith('/expense') || p.startsWith('/expenses')) {
     if (role === 'employee') {
-      return [{ title: 'EXPENSES', items: [{ label: 'My claims', to: '/expense', icon: ic('receipt', 15) }] }];
+      return [{ title: 'EXPENSES', items: [{ label: 'My claims', to: '/expense/my-claims', icon: ic('receipt', 15) }] }];
     }
     return [
       {
-        title: 'EXPENSE MANAGEMENT',
+        title: 'OVERVIEW',
         items: [
-          { label: 'Approval queue', to: '/expense/finance', icon: ic('receipt', 15) },
+          { label: 'Expense dashboard', to: '/expense', icon: ic('dashboard', 15) },
+        ],
+      },
+      {
+        title: 'CLAIMS & EXPENSES',
+        items: [
+          { label: 'All claims', to: '/expense/claims', icon: ic('receipt', 15) },
           { label: 'Office expenses', to: '/expense/office', icon: ic('pay', 15) },
-          { label: 'Submit claim', to: '/expense', icon: ic('plus', 15) },
         ],
       },
     ];

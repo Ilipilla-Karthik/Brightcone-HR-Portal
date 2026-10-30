@@ -1,4 +1,4 @@
-﻿import React, { useState } from 'react'
+import React, { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Download, FileCheck, Building2, ArrowUpRight } from 'lucide-react'
 import { ExpenseStatCards } from './ExpenseStatCards'
@@ -54,7 +54,7 @@ export const ExpenseAdminDashboard: React.FC = () => {
               <span>Export</span>
             </button>
             <button
-              onClick={() => navigate('/expenses/claims')}
+              onClick={() => navigate('/expense/claims')}
               className="px-5 py-2.5 rounded-xl bg-white hover:bg-slate-100 text-slate-950 text-sm font-bold flex items-center gap-2 transition-all shadow-md hover:shadow-lg hover:scale-[1.02] active:scale-[0.98]"
             >
               <FileCheck size={17} className="text-amber-700" />

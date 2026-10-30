@@ -37,6 +37,7 @@ import { PfEsiCompliancePage } from './pages/payroll/PfEsiCompliancePage';
 import { StatutoryCompliancePage } from './pages/payroll/StatutoryCompliancePage';
 import { ExpenseEmployeePage } from './pages/payroll/ExpenseEmployeePage';
 import { ExpenseFinancePage } from './pages/payroll/ExpenseFinancePage';
+import { ExpenseAdminDashboard } from './people-plus/expense/ExpenseAdminDashboard';
 import { OfficeExpensePage } from './pages/payroll/OfficeExpensePage';
 
 import { LearnDashboard } from './pages/learn/LearnDashboard';
@@ -61,7 +62,7 @@ import { WorkFromHomePage } from './pages/WorkFromHomePage';
 import { CompOffTrackerPage } from './pages/CompOffTrackerPage';
 import { ShiftsPage } from './pages/time/ShiftsPage';
 import { LeaveCalculatorPage } from './pages/LeaveCalculatorPage';
-import { LeaveQuotasAdminPage } from './pages/time/LeaveQuotasAdminPage';
+import { LeaveBalancePage } from './pages/time/LeaveBalancePage';
 import { LeaveTypesAdminPage } from './pages/time/LeaveTypesAdminPage';
 
 import { EmployeesPage } from './pages/people/EmployeesPage';
@@ -230,12 +231,15 @@ const AppLayout: React.FC = () => {
               <Route path="/payroll/benefits" element={<BenefitsAdminPage />} />
 
               {/* Expense */}
-              <Route path="/expense" element={<ExpenseEmployeePage />} />
+              <Route path="/expense" element={role === 'employee' ? <ExpenseEmployeePage /> : <ExpenseAdminDashboard />} />
+              <Route path="/expense/dashboard" element={<ExpenseAdminDashboard />} />
               <Route path="/expense/finance" element={<ExpenseFinancePage />} />
               <Route path="/expense/claims" element={<ExpenseFinancePage />} />
+              <Route path="/expense/all" element={<ExpenseFinancePage />} />
               <Route path="/expense/office" element={<OfficeExpensePage />} />
               <Route path="/expense/my-claims" element={<ExpenseEmployeePage />} />
-              <Route path="/expenses" element={<Navigate to={role === 'employee' ? '/expense' : '/expense/finance'} replace />} />
+              <Route path="/expenses" element={<Navigate to={role === 'employee' ? '/expense' : '/expense/dashboard'} replace />} />
+              <Route path="/expenses/dashboard" element={<ExpenseAdminDashboard />} />
               <Route path="/expenses/claims" element={<ExpenseFinancePage />} />
               <Route path="/expenses/office" element={<OfficeExpensePage />} />
               <Route path="/expenses/my-claims" element={<ExpenseEmployeePage />} />
@@ -263,19 +267,26 @@ const AppLayout: React.FC = () => {
               <Route path="/time" element={<ShiftRosterPage />} />
               <Route path="/time/roster" element={<ShiftRosterPage />} />
               <Route path="/time/attendance" element={<AttendanceAdmin />} />
+              <Route path="/time/daily-attendance" element={<AttendanceAdmin />} />
               <Route path="/time/login-logout" element={<MyAttendancePage />} />
+              <Route path="/time/logs" element={<MyAttendancePage />} />
               <Route path="/time/leave" element={<MyLeavePage />} />
-              <Route path="/time/leave-balance" element={<MyLeavePage />} />
+              <Route path="/time/leaves" element={<MyLeavePage />} />
+              <Route path="/time/leave-requests" element={<MyLeavePage />} />
+              <Route path="/time/leave-balance" element={<LeaveBalancePage />} />
+              <Route path="/time/leave/balance" element={<LeaveBalancePage />} />
               <Route path="/time/leave-calculator" element={<LeaveCalculatorPage />} />
               <Route path="/time/leave/calculator" element={<LeaveCalculatorPage />} />
-              <Route path="/time/leave-quotas" element={<LeaveQuotasAdminPage />} />
-              <Route path="/time/leave/quotas" element={<LeaveQuotasAdminPage />} />
-              <Route path="/time/quotas" element={<LeaveQuotasAdminPage />} />
+              <Route path="/time/leave-quotas" element={<LeaveBalancePage />} />
+              <Route path="/time/leave/quotas" element={<LeaveBalancePage />} />
+              <Route path="/time/quotas" element={<LeaveBalancePage />} />
               <Route path="/time/leave-types" element={<LeaveTypesAdminPage />} />
               <Route path="/time/leave/types" element={<LeaveTypesAdminPage />} />
               <Route path="/time/wfh" element={<WorkFromHomePage />} />
               <Route path="/time/comp-off" element={<CompOffTrackerPage />} />
+              <Route path="/time/compoff" element={<CompOffTrackerPage />} />
               <Route path="/time/holidays" element={<HolidayAdminPage />} />
+              <Route path="/time/holiday-calendar" element={<HolidayAdminPage />} />
               <Route path="/time/swaps" element={<ShiftSwapPage />} />
               <Route path="/time/swap" element={<ShiftSwapPage />} />
               <Route path="/time/shifts" element={<ShiftsPage />} />
