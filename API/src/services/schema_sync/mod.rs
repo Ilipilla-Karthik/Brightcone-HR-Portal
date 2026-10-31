@@ -9,6 +9,7 @@ use std::collections::HashSet;
 use tracing::{info, warn};
 
 mod dyn_sync;
+mod suite_sync;
 
 use crate::models::_entities::prelude::*;
 
@@ -331,6 +332,9 @@ async fn run_sync_inner(
 
     // 5. Additive synchronization of dynamic record tables (People Plus kinds).
     dyn_sync::sync_tables(db).await?;
+
+    // 6. Ensure People Plus suite domain tables and newly created employee fields exist
+    suite_sync::sync_suite_tables(db).await?;
 
     info!("[SCHEMA-SYNC] Schema synchronization completed successfully.");
     Ok(())
